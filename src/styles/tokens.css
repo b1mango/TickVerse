@@ -1,0 +1,99 @@
+/*
+ * 设计 Token · 拾刻 TickVerse
+ * 终值来源：《视觉方向稿.md》v2 §13（档案室 2026-08-27 评审通过；极简随 v2 成稿）
+ * 约束：全项目只引用 token，不写散落魔法值；主题切换 = 根节点换 data-style / data-mode。
+ */
+
+/* 档案室 · 明「宣纸」 */
+[data-style='archive'][data-mode='light'] {
+  --bg: #f7f4ee;
+  --surface: #fdfbf6;
+  --ink: #1a1815;
+  --sub: #8a8378;
+  --line: #e5dfd2;
+  --accent: #c53a2e;
+  --font-display: 'Noto Serif SC', 'Fraunces', serif;
+  --noise-opacity: 0.04;
+  --radius-ctl: 6px;
+  --radius-card: 12px;
+  --dur-micro: 120ms;
+  --dur-fast: 200ms;
+  --dur-normal: 300ms;
+  --dur-slow: 450ms;
+  --shadow-float: 0 8px 24px rgba(26, 24, 21, 0.08);
+}
+
+/* 档案室 · 暗「墨室」 */
+[data-style='archive'][data-mode='dark'] {
+  --bg: #14120f;
+  --surface: #1c1915;
+  --ink: #ede6d8;
+  --sub: #9a917f;
+  --line: #332e26;
+  --accent: #d4573f;
+  --font-display: 'Noto Serif SC', 'Fraunces', serif;
+  --noise-opacity: 0.04;
+  --radius-ctl: 6px;
+  --radius-card: 12px;
+  --dur-micro: 120ms;
+  --dur-fast: 200ms;
+  --dur-normal: 300ms;
+  --dur-slow: 450ms;
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* 极简 · 明「白页」 */
+[data-style='mono'][data-mode='light'] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --ink: #111111;
+  --sub: #a3a3a3;
+  --line: #ebebeb;
+  --accent: #c53a2e;
+  --font-display: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --noise-opacity: 0;
+  --radius-ctl: 4px;
+  --radius-card: 8px;
+  /* 动效降档：100/150/240/350 */
+  --dur-micro: 100ms;
+  --dur-fast: 150ms;
+  --dur-normal: 240ms;
+  --dur-slow: 350ms;
+  --shadow-float: 0 8px 24px rgba(26, 24, 21, 0.08);
+}
+
+/* 极简 · 暗「黑场」 */
+[data-style='mono'][data-mode='dark'] {
+  --bg: #0a0a0a;
+  --surface: #0a0a0a;
+  --ink: #f5f5f5;
+  --sub: #737373;
+  --line: #1f1f1f;
+  --accent: #d4573f;
+  --font-display: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --noise-opacity: 0;
+  --radius-ctl: 4px;
+  --radius-card: 8px;
+  --dur-micro: 100ms;
+  --dur-fast: 150ms;
+  --dur-normal: 240ms;
+  --dur-slow: 350ms;
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* 两风格四主题共通 */
+:root {
+  --font-body: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --text-display-1: 56px/64px;
+  --text-display-2: 40px/48px;
+  --text-title: 24px/32px;
+  --text-body: 15px/26px;
+  --text-caption: 12px/18px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 40px;
+  --space-5: 64px;
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+}
