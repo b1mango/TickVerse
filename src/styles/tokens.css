@@ -12,6 +12,13 @@
   --sub: #8a8378;
   --line: #e5dfd2;
   --accent: #c53a2e;
+  /* RGB 三通道副本：供 tailwind <alpha-value> 透明度修饰符使用（bg-ink/45 等） */
+  --bg-rgb: 247 244 238;
+  --surface-rgb: 253 251 246;
+  --ink-rgb: 26 24 21;
+  --sub-rgb: 138 131 120;
+  --line-rgb: 229 223 210;
+  --accent-rgb: 197 58 46;
   --font-display: 'Noto Serif SC', 'Fraunces', serif;
   --noise-opacity: 0.04;
   --radius-ctl: 6px;
@@ -31,6 +38,12 @@
   --sub: #9a917f;
   --line: #332e26;
   --accent: #d4573f;
+  --bg-rgb: 20 18 15;
+  --surface-rgb: 28 25 21;
+  --ink-rgb: 237 230 216;
+  --sub-rgb: 154 145 127;
+  --line-rgb: 51 46 38;
+  --accent-rgb: 212 87 63;
   --font-display: 'Noto Serif SC', 'Fraunces', serif;
   --noise-opacity: 0.04;
   --radius-ctl: 6px;
@@ -50,6 +63,12 @@
   --sub: #a3a3a3;
   --line: #ebebeb;
   --accent: #c53a2e;
+  --bg-rgb: 255 255 255;
+  --surface-rgb: 255 255 255;
+  --ink-rgb: 17 17 17;
+  --sub-rgb: 163 163 163;
+  --line-rgb: 235 235 235;
+  --accent-rgb: 197 58 46;
   --font-display: 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --noise-opacity: 0;
   --radius-ctl: 4px;
@@ -70,6 +89,12 @@
   --sub: #737373;
   --line: #1f1f1f;
   --accent: #d4573f;
+  --bg-rgb: 10 10 10;
+  --surface-rgb: 10 10 10;
+  --ink-rgb: 245 245 245;
+  --sub-rgb: 115 115 115;
+  --line-rgb: 31 31 31;
+  --accent-rgb: 212 87 63;
   --font-display: 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --noise-opacity: 0;
   --radius-ctl: 4px;

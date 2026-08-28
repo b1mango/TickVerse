@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#F7F4EE" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>拾刻 TickVerse</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -10,6 +14,25 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@600;700&display=swap"
       rel="stylesheet"
     />
+    <script>
+      /* 自愈：WebView2 缓存的旧 index.html 会引用已不存在的 JS hash（升级后白屏根因）。
+         模块脚本加载失败时，带 cache-busting 参数重载一次，绕过 HTTP 缓存拿到新壳。 */
+      (function () {
+        if (window.__bootRetried) return;
+        document.addEventListener(
+          'error',
+          function (e) {
+            var t = e.target;
+            if (window.__bootRetried || !t || t.tagName !== 'SCRIPT') return;
+            window.__bootRetried = true;
+            var u = new URL(location.href);
+            u.searchParams.set('_r', String(Date.now()));
+            location.replace(u.toString());
+          },
+          true,
+        );
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -34,3 +34,8 @@ export function useActiveCounts(): Record<Horizon, number> {
   });
   return counts ?? { today: 0, short: 0, long: 0 };
 }
+
+/** 时间轴页（M3）：全量任务实时查询，视图计算走 timelineService 纯函数 */
+export function useAllTasks(): Task[] | undefined {
+  return useLiveQuery(() => db.tasks.toArray(), []);
+}

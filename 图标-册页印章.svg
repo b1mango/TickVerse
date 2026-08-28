@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- 拾刻 TickVerse 应用图标 · 方案 B「册页 + 朱砂印章」立体版（2026-08-28 用户钦定立体观感） -->
+  <!-- 立体手法：书芯顶面/侧面厚度 + 左上光源渐变 + 落地软影 + 印章起凸；无背景，适配小尺寸 -->
+  <defs>
+    <linearGradient id="coverGrad" x1="0" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#2d2721"/>
+      <stop offset="0.55" stop-color="#1c1813"/>
+      <stop offset="1" stop-color="#12100c"/>
+    </linearGradient>
+    <linearGradient id="paperTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#faf5e9"/>
+      <stop offset="1" stop-color="#e6dcc7"/>
+    </linearGradient>
+    <linearGradient id="paperSide" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f1e9d7"/>
+      <stop offset="1" stop-color="#d6cab0"/>
+    </linearGradient>
+    <linearGradient id="sealGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d64a3d"/>
+      <stop offset="1" stop-color="#a02a20"/>
+    </linearGradient>
+    <filter id="blur6" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+    <filter id="blur3" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+  </defs>
+
+  <!-- 落地软影：把册页"垫"离纸面，营造悬浮立体感 -->
+  <ellipse cx="128" cy="216" rx="66" ry="10" fill="#1a1815" opacity="0.18" filter="url(#blur6)"/>
+
+  <!-- 书芯顶面（页块厚度，受光最亮） -->
+  <path d="M 60 54 L 78 34 L 192 34 L 174 54 Z" fill="url(#paperTop)"/>
+  <!-- 顶面页层细线 -->
+  <path d="M 67 48 L 181 48" stroke="#c9bb9e" stroke-width="1.4" opacity="0.8"/>
+  <path d="M 71 43 L 185 43" stroke="#c9bb9e" stroke-width="1.2" opacity="0.55"/>
+  <path d="M 75 38.5 L 188 38.5" stroke="#c9bb9e" stroke-width="1" opacity="0.35"/>
+
+  <!-- 书芯侧面（页块厚度，背光稍暗） -->
+  <path d="M 174 54 L 192 34 L 192 184 L 174 204 Z" fill="url(#paperSide)"/>
+  <!-- 侧面页层细线 -->
+  <path d="M 178 66 L 188 56 M 178 96 L 188 86 M 178 126 L 188 116 M 178 156 L 188 146 M 178 186 L 188 176" stroke="#c4b596" stroke-width="1.2" opacity="0.55"/>
+
+  <!-- 封面（墨黑册页，左上光源渐变） -->
+  <rect x="52" y="54" width="122" height="150" rx="10" fill="url(#coverGrad)"/>
+  <!-- 封面受光边：顶/左细高光 -->
+  <path d="M 62 54.8 L 164 54.8 A 9 9 0 0 0 164 54.8" stroke="#ffffff" stroke-width="1.4" opacity="0.14" fill="none"/>
+  <path d="M 52.8 64 L 52.8 194" stroke="#ffffff" stroke-width="1.4" opacity="0.10" fill="none"/>
+  <!-- 封面背光边：右/下细暗线压出体积 -->
+  <path d="M 173.2 64 L 173.2 194" stroke="#000000" stroke-width="1.6" opacity="0.35" fill="none"/>
+  <path d="M 62 203.2 L 164 203.2" stroke="#000000" stroke-width="1.6" opacity="0.30" fill="none"/>
+
+  <!-- 页边纸色细线（方案 B 的识别 motif，保留并弱化） -->
+  <rect x="152" y="72" width="3" height="112" rx="1.5" fill="#f5f0e6" opacity="0.45"/>
+  <rect x="158.5" y="72" width="1.6" height="112" rx="0.8" fill="#f5f0e6" opacity="0.25"/>
+
+  <!-- 印章投影（压在封面上） -->
+  <rect x="118" y="141" width="62" height="62" rx="9" fill="#000000" opacity="0.35" filter="url(#blur3)"/>
+  <!-- 朱砂印章：越过封面右缘 4px，像真的钤在书角上 -->
+  <rect x="116" y="138" width="62" height="62" rx="9" fill="url(#sealGrad)"/>
+  <!-- 印章起凸：内上/左高光 + 内下/右暗缘 -->
+  <path d="M 125 139.5 L 169 139.5 M 117.5 147 L 117.5 191" stroke="#ff8a7a" stroke-width="1.6" opacity="0.5" fill="none"/>
+  <path d="M 125 198.5 L 169 198.5 M 176.5 147 L 176.5 191" stroke="#5f120c" stroke-width="1.6" opacity="0.55" fill="none"/>
+
+  <!-- 章内对勾：先落暗色凹影，再落米白笔道，形成压印感 -->
+  <path d="M 129 169 L 142.5 182.5 L 168 152.5" fill="none" stroke="#6e160f" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6" transform="translate(1.2 1.8)"/>
+  <path d="M 129 169 L 142.5 182.5 L 168 152.5" fill="none" stroke="#f7f1e4" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

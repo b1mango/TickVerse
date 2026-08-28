@@ -40,8 +40,37 @@ export const taskRepo = {
     await db.tasks.delete(id);
   },
 
+  /** 批量写入（演示数据填充用） */
+  async bulkAdd(tasks: Task[]): Promise<void> {
+    await db.tasks.bulkAdd(tasks);
+  },
+
+  /** 按标签批量删除（演示数据清除用），返回删除条数 */
+  async removeByTag(tag: string): Promise<number> {
+    const ids = await db.tasks.filter((t) => t.tags?.includes(tag) ?? false).primaryKeys();
+    await db.tasks.bulkDelete(ids);
+    return ids.length;
+  },
+
   async getById(id: string): Promise<Task | undefined> {
     return db.tasks.get(id);
+  },
+
+  /** 拖拽落点持久化：事务内批量写 order（跨模块时连同 horizon 一起写） */
+  async reorder(updates: Array<{ id: string; order: number; horizon?: Horizon }>): Promise<void> {
+    if (updates.length === 0) return;
+    const now = Date.now();
+    await db.transaction('rw', db.tasks, async () => {
+      await Promise.all(
+        updates.map((u) =>
+          db.tasks.update(u.id, {
+            order: u.order,
+            ...(u.horizon !== undefined ? { horizon: u.horizon } : {}),
+            updatedAt: now,
+          }),
+        ),
+      );
+    });
   },
 
   /** 跨天滚存：今日且未完成 → 滚入短期并置顶（order 取 short 最小值之前） */

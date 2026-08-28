@@ -11,3 +11,140 @@
     color: var(--ink);
   }
 }
+
+@layer utilities {
+  /* 字阶（《视觉方向稿.md》§4）：--text-* 为 "字号/行高" 合成值，借 font 简写展开 */
+  .text-display-1 {
+    font: var(--text-display-1) var(--font-display);
+  }
+  .text-display-2 {
+    font: var(--text-display-2) var(--font-display);
+  }
+  .text-title {
+    font: var(--text-title) var(--font-display);
+  }
+  .text-body {
+    font: var(--text-body) var(--font-body);
+  }
+  .text-caption {
+    font: var(--text-caption) var(--font-mono);
+  }
+}
+
+/* 隐藏滑动条但保留滚动（编辑页三模块卡片清单用，2026-08-28 用户钦定） */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 记录页布局切换过渡（--dur-normal）：opacity + 轻微位移 */
+@keyframes layout-mode-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.layout-mode-in {
+  animation: layout-mode-in var(--dur-normal) var(--ease-spring) both;
+}
+
+/* 自定义布局画布：拖拽时显示 24px 淡网格点（磁吸参考线） */
+.custom-canvas-grid {
+  background-image: radial-gradient(circle, rgb(var(--ink-rgb) / 0.18) 1px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+/* 朱砂归档戳（方向稿 §5/§6）：档案室 1.5px 描边旋转 −8°；极简纯文字直出不旋转 */
+.archive-stamp {
+  display: inline-block;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-ctl);
+  padding: 2px 10px;
+  color: var(--accent);
+  animation: stamp-in var(--dur-normal) var(--ease-spring) both;
+}
+[data-style='archive'] .archive-stamp {
+  transform: rotate(-8deg);
+}
+[data-style='mono'] .archive-stamp {
+  border: none;
+  padding: 0;
+}
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 全局滑动条（2026-08-28 用户钦定）：一律无轨道背景、无箭头按钮；
+   滑块 = 两端渐隐的墨迹（半透明 ink 渐变），hover 时墨色变浓。
+   覆盖页面主滚动条、卡片清单、设置列表等一切滚动位置 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--ink-rgb) / 0.28) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgb(var(--ink-rgb) / 0) 0%,
+    rgb(var(--ink-rgb) / 0.28) 15%,
+    rgb(var(--ink-rgb) / 0.28) 85%,
+    rgb(var(--ink-rgb) / 0) 100%
+  );
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--ink-rgb) / 0.45);
+}
+
+/* 水墨横向滑动条（2026-08-28 用户钦定）：无轨道背景、与纸面融合；
+   滑块 = 两端渐隐的墨迹（半透明 ink 渐变），hover 时墨色变浓 */
+.ink-scroll-x {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--ink-rgb) / 0.25) transparent;
+}
+.ink-scroll-x::-webkit-scrollbar {
+  height: 5px;
+}
+.ink-scroll-x::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ink-scroll-x::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--ink-rgb) / 0) 0%,
+    rgb(var(--ink-rgb) / 0.28) 15%,
+    rgb(var(--ink-rgb) / 0.28) 85%,
+    rgb(var(--ink-rgb) / 0) 100%
+  );
+  border-radius: 999px;
+}
+.ink-scroll-x:hover::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--ink-rgb) / 0) 0%,
+    rgb(var(--ink-rgb) / 0.45) 15%,
+    rgb(var(--ink-rgb) / 0.45) 85%,
+    rgb(var(--ink-rgb) / 0) 100%
+  );
+}

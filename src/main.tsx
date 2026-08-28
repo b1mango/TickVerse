@@ -11,3 +11,19 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <AppRouter />
   </React.StrictMode>,
 );
+
+// PWA（清单 M5-4）：生产环境注册 Service Worker，离线可用；Tauri 桌面端跳过（tauri:// 协议不支持 SW）
+if ('__TAURI_INTERNALS__' in window) {
+  // 桌面端兜底：旧版本曾注册过 SW，其缓存会供出过期 index.html 导致白屏；
+  // Rust 侧启动时已删 SW 目录，这里再注销一遍防残留（页面能跑起来的前提下）
+  void navigator.serviceWorker
+    ?.getRegistrations()
+    .then((rs) => Promise.all(rs.map((r) => r.unregister())))
+    .then(() => caches.keys())
+    .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+    .catch(() => {});
+} else if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>拾刻 TickVerse · 图标方案预览</title>
+<style>
+  body { margin: 0; padding: 48px; font-family: 'Noto Serif SC', serif; background: #f5f0e6; color: #1a1815; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  .sub { font-family: ui-monospace, monospace; font-size: 12px; color: #6f6a61; margin-bottom: 40px; }
+  .scheme { margin-bottom: 56px; }
+  .scheme h2 { font-size: 18px; margin: 0 0 4px; }
+  .scheme .desc { font-size: 13px; color: #6f6a61; margin-bottom: 20px; max-width: 640px; line-height: 1.7; }
+  .row { display: flex; align-items: flex-end; gap: 32px; }
+  .tile { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .tile .label { font-family: ui-monospace, monospace; font-size: 11px; color: #6f6a61; }
+  .box { display: flex; align-items: center; justify-content: center; }
+  .paper { background: #fdfbf6; border: 1px solid #e2dccb; border-radius: 12px; }
+  .dark { background: #1c1915; border-radius: 12px; }
+  .clear { background: repeating-conic-gradient(#e8e2d4 0 25%, #f5f0e6 0 50%) 0 0 / 16px 16px; border-radius: 12px; }
+</style>
+</head>
+<body>
+
+<h1>拾刻 TickVerse · 应用图标方案</h1>
+<p class="sub">2026-08-28 · 透明底 · 朱砂 #C53A2E / 墨 #1A1815 · 16px 小尺寸可辨识性实测</p>
+
+<!-- ============ 方案 A：一笔朱勾 ============ -->
+<section class="scheme">
+  <h2>方案 A · 一笔朱勾（推荐）</h2>
+  <p class="desc">毛笔写成的一笔对勾：单一动作隐喻（勾选 = 完成），收笔处一处飞白。剪影极简，16px 仍清晰；朱砂主色，暗底场景内部保留米白托底缺口以保证对比度。</p>
+  <div class="row">
+    <div class="tile"><div class="box clear" style="width:160px;height:160px">
+      <!-- 128px 主视图 -->
+      <svg width="128" height="128" viewBox="0 0 256 256">
+        <defs>
+          <mask id="flyA">
+            <rect width="256" height="256" fill="#fff"/>
+            <!-- 飞白：笔锋内侧一道细缝 -->
+            <rect x="196" y="72" width="34" height="5" rx="2.5" fill="#000" transform="rotate(-52 196 72)"/>
+          </mask>
+        </defs>
+        <path mask="url(#flyA)" fill="#c53a2e" d="
+          M 44 128
+          C 58 122, 72 130, 84 146
+          C 96 162, 106 180, 114 196
+          C 120 208, 132 206, 138 194
+          C 164 150, 198 102, 234 56
+          L 240 50
+          C 212 86, 192 110, 174 136
+          C 154 164, 140 184, 126 206
+          C 118 218, 100 216, 92 202
+          C 78 180, 62 158, 48 142
+          C 40 133, 40 132, 44 128
+          Z"/>
+      </svg>
+    </div><span class="label">128 · 透明底</span></div>
+    <div class="tile"><div class="box paper" style="width:96px;height:96px">
+      <svg width="64" height="64" viewBox="0 0 256 256"><path mask="url(#flyA)" fill="#c53a2e" d="M 44 128 C 58 122, 72 130, 84 146 C 96 162, 106 180, 114 196 C 120 208, 132 206, 138 194 C 164 150, 198 102, 234 56 L 240 50 C 212 86, 192 110, 174 136 C 154 164, 140 184, 126 206 C 118 218, 100 216, 92 202 C 78 180, 62 158, 48 142 C 40 133, 40 132, 44 128 Z"/></svg>
+    </div><span class="label">64 · 宣纸底</span></div>
+    <div class="tile"><div class="box dark" style="width:96px;height:96px">
+      <svg width="64" height="64" viewBox="0 0 256 256"><path mask="url(#flyA)" fill="#d4573f" d="M 44 128 C 58 122, 72 130, 84 146 C 96 162, 106 180, 114 196 C 120 208, 132 206, 138 194 C 164 150, 198 102, 234 56 L 240 50 C 212 86, 192 110, 174 136 C 154 164, 140 184, 126 206 C 118 218, 100 216, 92 202 C 78 180, 62 158, 48 142 C 40 133, 40 132, 44 128 Z"/></svg>
+    </div><span class="label">64 · 墨室底</span></div>
+    <div class="tile"><div class="box paper" style="width:56px;height:56px">
+      <svg width="24" height="24" viewBox="0 0 256 256"><path fill="#c53a2e" d="M 44 128 C 58 122, 72 130, 84 146 C 96 162, 106 180, 114 196 C 120 208, 132 206, 138 194 C 164 150, 198 102, 234 56 L 240 50 C 212 86, 192 110, 174 136 C 154 164, 140 184, 126 206 C 118 218, 100 216, 92 202 C 78 180, 62 158, 48 142 C 40 133, 40 132, 44 128 Z"/></svg>
+    </div><span class="label">24（小尺寸去飞白）</span></div>
+    <div class="tile"><div class="box paper" style="width:48px;height:48px">
+      <svg width="16" height="16" viewBox="0 0 256 256"><path fill="#c53a2e" d="M 44 128 C 58 122, 72 130, 84 146 C 96 162, 106 180, 114 196 C 120 208, 132 206, 138 194 C 164 150, 198 102, 234 56 L 240 50 C 212 86, 192 110, 174 136 C 154 164, 140 184, 126 206 C 118 218, 100 216, 92 202 C 78 180, 62 158, 48 142 C 40 133, 40 132, 44 128 Z"/></svg>
+    </div><span class="label">16</span></div>
+  </div>
+</section>
+
+<!-- ============ 方案 B：册页 + 印章勾 ============ -->
+<section class="scheme">
+  <h2>方案 B · 册页 + 朱砂印章</h2>
+  <p class="desc">册页剪影（墨色，双层书页）+ 右下角一枚朱砂小印章，章内米白对勾。更贴"档案室"气质，但两个元素在 16px 下印章会糊成色块，辨识度弱于方案 A。</p>
+  <div class="row">
+    <div class="tile"><div class="box clear" style="width:160px;height:160px">
+      <svg width="128" height="128" viewBox="0 0 256 256">
+        <!-- 册页：后页 + 前页 -->
+        <rect x="72" y="40" width="118" height="150" rx="10" fill="#1a1815" opacity="0.28"/>
+        <rect x="56" y="56" width="118" height="150" rx="10" fill="#1a1815"/>
+        <!-- 页边两道纸色细线 -->
+        <rect x="160" y="72" width="4" height="118" rx="2" fill="#f5f0e6" opacity="0.85"/>
+        <rect x="150" y="72" width="2" height="118" rx="1" fill="#f5f0e6" opacity="0.5"/>
+        <!-- 朱砂印章 -->
+        <rect x="150" y="160" width="58" height="58" rx="8" fill="#c53a2e"/>
+        <!-- 章内米白对勾 -->
+        <path d="M 162 190 L 174 202 L 196 172" fill="none" stroke="#f5f0e6" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div><span class="label">128 · 透明底</span></div>
+    <div class="tile"><div class="box paper" style="width:96px;height:96px">
+      <svg width="64" height="64" viewBox="0 0 256 256">
+        <rect x="72" y="40" width="118" height="150" rx="10" fill="#1a1815" opacity="0.28"/>
+        <rect x="56" y="56" width="118" height="150" rx="10" fill="#1a1815"/>
+        <rect x="160" y="72" width="4" height="118" rx="2" fill="#f5f0e6" opacity="0.85"/>
+        <rect x="150" y="72" width="2" height="118" rx="1" fill="#f5f0e6" opacity="0.5"/>
+        <rect x="150" y="160" width="58" height="58" rx="8" fill="#c53a2e"/>
+        <path d="M 162 190 L 174 202 L 196 172" fill="none" stroke="#f5f0e6" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div><span class="label">64 · 宣纸底</span></div>
+    <div class="tile"><div class="box dark" style="width:96px;height:96px">
+      <svg width="64" height="64" viewBox="0 0 256 256">
+        <rect x="72" y="40" width="118" height="150" rx="10" fill="#ede6d8" opacity="0.28"/>
+        <rect x="56" y="56" width="118" height="150" rx="10" fill="#ede6d8"/>
+        <rect x="160" y="72" width="4" height="118" rx="2" fill="#1c1915" opacity="0.85"/>
+        <rect x="150" y="72" width="2" height="118" rx="1" fill="#1c1915" opacity="0.5"/>
+        <rect x="150" y="160" width="58" height="58" rx="8" fill="#d4573f"/>
+        <path d="M 162 190 L 174 202 L 196 172" fill="none" stroke="#f5f0e6" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div><span class="label">64 · 墨室底</span></div>
+    <div class="tile"><div class="box paper" style="width:56px;height:56px">
+      <svg width="24" height="24" viewBox="0 0 256 256">
+        <rect x="56" y="56" width="118" height="150" rx="10" fill="#1a1815"/>
+        <rect x="150" y="160" width="58" height="58" rx="8" fill="#c53a2e"/>
+        <path d="M 162 190 L 174 202 L 196 172" fill="none" stroke="#f5f0e6" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div><span class="label">24（简化层叠）</span></div>
+    <div class="tile"><div class="box paper" style="width:48px;height:48px">
+      <svg width="16" height="16" viewBox="0 0 256 256">
+        <rect x="56" y="56" width="118" height="150" rx="10" fill="#1a1815"/>
+        <rect x="150" y="160" width="58" height="58" rx="8" fill="#c53a2e"/>
+        <path d="M 162 190 L 174 202 L 196 172" fill="none" stroke="#f5f0e6" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div><span class="label">16</span></div>
+  </div>
+</section>
+
+</body>
+</html>

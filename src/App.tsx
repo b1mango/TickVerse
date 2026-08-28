@@ -3,7 +3,9 @@ import { BarChart3, PenLine, Ruler, Settings } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { Toast } from '@/components/ui/Toast';
 import { rolloverOnLaunch } from '@/services/rolloverService';
+import { initSync } from '@/services/syncService';
 import { useTaskStore } from '@/stores/taskStore';
+import { useUiStore } from '@/stores/uiStore';
 
 const NAV = [
   { to: '/', label: '编辑', icon: PenLine },
@@ -18,6 +20,20 @@ function App() {
 
   useEffect(() => {
     void rolloverOnLaunch().then(setRolledOverIds);
+    // WebDAV 快照同步（清单 M5-4）：启用时打开拉取一次，本地变更防抖推送
+    initSync();
+    // 浏览器数据防清理（清单 M5-3）：申请持久存储，被拒则提示定期导出备份
+    void navigator.storage
+      ?.persisted()
+      .then((persisted) => persisted || navigator.storage.persist())
+      .then((granted) => {
+        if (!granted) {
+          useUiStore.getState().showToast({
+            message: '浏览器未授予持久存储，数据可能被清理，建议定期导出 JSON 备份',
+          });
+        }
+      })
+      .catch(() => {});
   }, [setRolledOverIds]);
 
   return (
