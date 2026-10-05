@@ -58,9 +58,9 @@ function DayTemplate({ column, level, now }: { column: ZoomColumn; level: ZoomLe
 
       <div
         ref={contentRef}
-        {...(expanded ? { 'data-card-scroll': '' } : {})}
+        {...(expanded || overflowing ? { 'data-card-scroll': '' } : {})}
         className={`mt-1.5 flex min-h-0 flex-1 flex-col ${compact ? 'gap-1' : 'gap-1.5'} ${
-          expanded ? 'overflow-y-auto' : 'overflow-hidden'
+          expanded ? 'overflow-y-auto' : overflowing ? 'no-scrollbar overflow-y-auto' : 'overflow-hidden'
         }`}
       >
         {/* 未完成投影在上（虚线态）；两行折行，窄卡也尽量读全 */}

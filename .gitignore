@@ -3,3 +3,6 @@ dist
 dist-ssr
 *.local
 .DS_Store
+
+# 工具本地状态（Reasonix 桌面会话元数据，不入库）
+.reasonix/

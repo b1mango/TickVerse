@@ -148,7 +148,7 @@ export function TimelinePage() {
   };
 
   /** 滚轮：Ctrl+滚轮 = 离散换档缩放（一次刻度 = 一档，任何位置生效）；
-   *  裸滚轮 = 横向滑动；但悬停在卡片内可纵向滚动清单（data-card-scroll，展开态）上时放行原生纵向滚动（2026-08-28 用户钦定） */
+   *  裸滚轮 = 横向滑动；但悬停在卡片内可纵向滚动清单（data-card-scroll，展开态或收起但内容溢出的卡片）上时放行原生纵向滚动（2026-08-28/29 用户钦定） */
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;

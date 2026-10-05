@@ -38,6 +38,7 @@ function SummaryContent({ content }: { content: string }) {
  */
 export function AiSummaryCard({ range, tasks }: AiSummaryCardProps) {
   const llm = useSettingsStore((s) => s.llm);
+  const setLlm = useSettingsStore((s) => s.setLlm);
   const showToast = useUiStore((s) => s.showToast);
   const rangeState = useAiSummaryStore((s) => s.byRange[range.id]);
   const loadCached = useAiSummaryStore((s) => s.loadCached);
@@ -94,6 +95,22 @@ export function AiSummaryCard({ range, tasks }: AiSummaryCardProps) {
       <div className="flex items-baseline justify-between">
         <h3 className="font-mono text-caption text-sub">AI 总结 · {range.label}</h3>
         <div className="flex gap-2">
+          {/* 总结用模型选择（来自设置页已勾选列表，改动即写回全局配置） */}
+          {llm.selectedModels.length > 0 && (
+            <select
+              value={llm.activeModel || llm.selectedModels[0]}
+              onChange={(e) => setLlm({ ...llm, activeModel: e.target.value })}
+              disabled={streaming}
+              title="选择本次总结使用的模型"
+              className="max-w-44 cursor-pointer rounded-full border border-line bg-transparent px-3 py-1 font-mono text-caption text-sub transition-colors hover:text-ink focus:outline-accent disabled:opacity-40"
+            >
+              {llm.selectedModels.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          )}
           {summary && !editing && (
             <button
               onClick={() => {
