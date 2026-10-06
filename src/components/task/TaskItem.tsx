@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { Task } from '@/types/task';
 import { tokenDuration } from '@/utils/motion';
 
@@ -8,8 +9,6 @@ type Phase = 'idle' | 'check' | 'strike' | 'leave' | 'stamp';
 
 interface TaskItemProps {
   task: Task;
-  /** 朱砂 mono 小标签（如"昨日遗留"），置顶于短期模块 */
-  badge?: string;
   /** 拖拽浮层内渲染时关闭交互 */
   overlay?: boolean;
   onComplete: (id: string) => void;
@@ -17,17 +16,39 @@ interface TaskItemProps {
   onRename: (id: string, title: string) => void;
 }
 
+/** 编辑框随内容自适应高度（多行保形：折行与换行都保留） */
+function autosize(ta: HTMLTextAreaElement): void {
+  ta.style.height = '0px';
+  ta.style.height = `${ta.scrollHeight}px`;
+}
+
 /**
  * 条目 = 勾选框 + 标题（+ 截止日/备注 M2 后迭代）。
  * 完成动效基础版：勾选描边（micro）→ 划线左→右（fast）→ 右移 24px 淡出（normal）
  * → 归档戳淡入（档案室描边戳旋转 −8° / 极简文字直出）→ 写 completedAt。
+ * 双击编辑：光标落回双击命中位置；编辑态 textarea 保形多行（Enter 提交 / Shift+Enter 换行 / Esc 取消）。
  */
-export function TaskItem({ task, badge, overlay, onComplete, onDelete, onRename }: TaskItemProps) {
+export function TaskItem({ task, overlay, onComplete, onDelete, onRename }: TaskItemProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [editing, setEditing] = useState(false);
+  /** 双击点的字符偏移（null = 落末尾） */
+  const [editCaret, setEditCaret] = useState<number | null>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  /** 进入编辑：聚焦 + 光标落到双击位置 + 高度跟随内容 */
+  useLayoutEffect(() => {
+    if (!editing) return;
+    const ta = editRef.current;
+    if (!ta) return;
+    autosize(ta);
+    ta.focus();
+    const pos = editCaret ?? ta.value.length;
+    ta.setSelectionRange(pos, pos);
+  }, [editing, editCaret]);
 
   const handleCheck = () => {
     if (phase !== 'idle') return;
@@ -43,11 +64,24 @@ export function TaskItem({ task, badge, overlay, onComplete, onDelete, onRename 
     ];
   };
   const handleDelete = () => onDelete(task.id);
-  const handleDoubleClick = () => {
-    if (!overlay && phase === 'idle') setEditing(true);
+  const handleDoubleClick = (e: React.MouseEvent<HTMLSpanElement>) => {
+    if (overlay || phase !== 'idle') return;
+    // caretRangeFromPoint 取命中文字节点的字符偏移；取不到（点在文本外/元素上）则落末尾
+    let caret: number | null = null;
+    const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (
+      range &&
+      range.startContainer.nodeType === Node.TEXT_NODE &&
+      e.currentTarget.contains(range.startContainer)
+    ) {
+      caret = range.startOffset;
+    }
+    setEditCaret(caret);
+    setEditing(true);
   };
   const commitRename = (value: string) => {
     setEditing(false);
+    setEditCaret(null);
     if (value.trim() && value.trim() !== task.title) onRename(task.id, value);
   };
 
@@ -63,8 +97,12 @@ export function TaskItem({ task, badge, overlay, onComplete, onDelete, onRename 
 
   return (
     <div
-      className={`group flex items-center gap-3 px-1 py-2 ${
-        overlay ? 'scale-[0.96] rounded-ctl bg-surface shadow-[var(--shadow-float)]' : ''
+      className={`group flex ${editing ? 'items-start' : 'items-center'} gap-3 rounded-ctl px-1 py-2 transition-colors hover:bg-ink/[0.04] ${
+        overlay
+          ? `bg-surface [box-shadow:var(--shadow-float)] ${
+              reducedMotion ? '' : 'scale-[1.02] -translate-y-0.5'
+            }`
+          : ''
       }`}
       style={{
         opacity: phase === 'leave' ? 0 : 1,
@@ -86,23 +124,33 @@ export function TaskItem({ task, badge, overlay, onComplete, onDelete, onRename 
             strokeLinecap="round"
             strokeDasharray={14}
             strokeDashoffset={phase === 'idle' ? 14 : 0}
+            /* round 线帽会把隐藏描边的端点渗成勾选框内的小黑点：未选中整条隐藏，保持空框干净 */
+            opacity={phase === 'idle' ? 0 : 1}
             style={{ transition: 'stroke-dashoffset var(--dur-micro) linear' }}
           />
         </svg>
       </button>
 
       {editing ? (
-        <input
-          autoFocus
+        <textarea
+          ref={editRef}
           defaultValue={task.title}
+          rows={1}
           onBlur={(e) => commitRename(e.target.value)}
+          onChange={(e) => autosize(e.currentTarget)}
           onKeyDown={(e) => {
             // 阻止冒泡：dnd-kit KeyboardSensor 挂在条目容器上，Enter/Space 会被误当拖拽激活键
             e.stopPropagation();
-            if (e.key === 'Enter') commitRename(e.currentTarget.value);
-            if (e.key === 'Escape') setEditing(false);
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              commitRename(e.currentTarget.value);
+            }
+            if (e.key === 'Escape') {
+              setEditing(false);
+              setEditCaret(null);
+            }
           }}
-          className="flex-1 bg-transparent text-body focus:outline-none"
+          className="w-full flex-1 resize-none overflow-hidden bg-transparent text-body focus:outline-none"
         />
       ) : (
         <span className="relative flex-1 text-body" onDoubleClick={handleDoubleClick}>
@@ -114,7 +162,6 @@ export function TaskItem({ task, badge, overlay, onComplete, onDelete, onRename 
         </span>
       )}
 
-      {badge && <span className="shrink-0 font-mono text-caption text-accent">{badge}</span>}
       {!overlay && (
         <button
           aria-label="删除"

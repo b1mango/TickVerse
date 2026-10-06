@@ -195,7 +195,7 @@ export function AiSummaryCard({ range, tasks }: AiSummaryCardProps) {
       {/* 首次生成前的隐私说明（仅弹一次） */}
       {showPrivacy && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-6">
-          <div className="max-w-md rounded-card border border-line bg-surface p-6 shadow-[var(--shadow-float)]">
+          <div className="max-w-md rounded-card border border-line bg-surface p-6 [box-shadow:var(--shadow-float)]">
             <h4 className="font-display text-title">生成前的说明</h4>
             <p className="mt-3 text-body leading-7">
               AI 总结会把所选周期内的<strong>完成记录（标题、完成时间、模块来源）</strong>

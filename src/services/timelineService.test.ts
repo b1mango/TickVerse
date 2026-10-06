@@ -42,7 +42,9 @@ describe('isOverdue', () => {
   });
   it('dueDate 为今天 / 已完成 / 无 dueDate → 不逾期', () => {
     expect(isOverdue(makeTask({ horizon: 'short', dueDate: '2026-08-28' }), NOW)).toBe(false);
-    expect(isOverdue(makeTask({ horizon: 'short', dueDate: '2026-08-01', completedAt: NOW }), NOW)).toBe(false);
+    expect(
+      isOverdue(makeTask({ horizon: 'short', dueDate: '2026-08-01', completedAt: NOW }), NOW),
+    ).toBe(false);
     expect(isOverdue(makeTask({ horizon: 'short' }), NOW)).toBe(false);
   });
 });
@@ -54,32 +56,32 @@ describe('六档缩放', () => {
     }
   });
   it('levelForPxPerDay：阈值区间按几何中点划分', () => {
-    // day(240) / week(120) 分界 = sqrt(240*120) ≈ 170
-    expect(levelForPxPerDay(200)).toBe('day');
-    expect(levelForPxPerDay(100)).toBe('week');
-    // month(72) / quarter(16) 分界 = sqrt(72*16) ≈ 34
-    expect(levelForPxPerDay(40)).toBe('month');
-    expect(levelForPxPerDay(20)).toBe('quarter');
-    // quarter(16) / year(4) 分界 = sqrt(64) = 8
-    expect(levelForPxPerDay(9)).toBe('quarter');
-    expect(levelForPxPerDay(5)).toBe('year');
-    // year(4) / years(0.8) 分界 = sqrt(3.2) ≈ 1.79
-    expect(levelForPxPerDay(2)).toBe('year');
-    expect(levelForPxPerDay(1)).toBe('years');
+    // day(400) / week(200) 分界 = sqrt(400*200) ≈ 283
+    expect(levelForPxPerDay(350)).toBe('day');
+    expect(levelForPxPerDay(250)).toBe('week');
+    // month(120) / quarter(24) 分界 = sqrt(120*24) ≈ 54
+    expect(levelForPxPerDay(70)).toBe('month');
+    expect(levelForPxPerDay(40)).toBe('quarter');
+    // quarter(24) / year(6) 分界 = sqrt(144) = 12
+    expect(levelForPxPerDay(13)).toBe('quarter');
+    expect(levelForPxPerDay(10)).toBe('year');
+    // year(6) / years(1) 分界 = sqrt(6) ≈ 2.45
+    expect(levelForPxPerDay(3)).toBe('year');
+    expect(levelForPxPerDay(1.5)).toBe('years');
   });
   it('snapPxPerDay：磁吸最近档位', () => {
-    expect(snapPxPerDay(230).level).toBe('day');
-    expect(snapPxPerDay(169).level).toBe('week'); // 169 < 170 分界
-    expect(snapPxPerDay(170).level).toBe('day');
-    expect(snapPxPerDay(90).level).toBe('month'); // 90 < 93 分界
-    expect(snapPxPerDay(95).level).toBe('week');
-    expect(snapPxPerDay(5).level).toBe('year');
-    expect(snapPxPerDay(1).level).toBe('years');
+    expect(snapPxPerDay(350).level).toBe('day');
+    expect(snapPxPerDay(260).level).toBe('week'); // 260 < 283 分界
+    expect(snapPxPerDay(290).level).toBe('day');
+    expect(snapPxPerDay(70).level).toBe('month');
+    expect(snapPxPerDay(16).level).toBe('quarter');
+    expect(snapPxPerDay(8).level).toBe('year');
+    expect(snapPxPerDay(1.5).level).toBe('years');
   });
   it('clampPxPerDay：边界锁定在日档与年视图档之间', () => {
-    expect(clampPxPerDay(999)).toBe(240);
-    expect(clampPxPerDay(0.1)).toBe(0.8);
-    expect(clampPxPerDay(120)).toBe(120);
+    expect(clampPxPerDay(999)).toBe(400);
+    expect(clampPxPerDay(0.1)).toBe(1);
+    expect(clampPxPerDay(200)).toBe(200);
   });
 });
 
@@ -95,17 +97,19 @@ describe('buildZoomView', () => {
     expect(view.end).toBe(day(7, 0));
   });
 
-  it('week 档：每日一列；完成落位、未完成投影今天列、长期锚未来端', () => {
+  it('week 档：每日一列；完成落位、象限任务投影写入日列、其余未完成投影今天列', () => {
     const done = makeTask({ horizon: 'today', createdAt: day(2), completedAt: day(2) });
-    const active = makeTask({ horizon: 'short' });
-    const long = makeTask({ horizon: 'long' });
-    const view = buildZoomView([done, active, long], 'week', NOW);
+    const legacy = makeTask({ horizon: 'long' });
+    const quad = makeTask({ horizon: 'long', quadrant: 'q2', createdAt: day(1) });
+    const view = buildZoomView([done, legacy, quad], 'week', NOW);
     expect(view.columns.every((c) => c.days === 1)).toBe(true);
     const doneCol = view.columns.find((c) => c.start === day(2, 0))!;
     expect(doneCol.completed.map((x) => x.id)).toEqual([done.id]);
     const todayCol = view.columns.find((c) => c.isToday)!;
-    expect(todayCol.projected.map((x) => x.id)).toEqual([active.id]);
-    expect(view.longAnchors.map((x) => x.id)).toEqual([long.id]);
+    expect(todayCol.projected.map((x) => x.id)).toEqual([legacy.id]); // 旧 horizon 数据仍投影今天列
+    const writtenCol = view.columns.find((c) => c.start === day(1, 0))!;
+    expect(writtenCol.projected.map((x) => x.id)).toEqual([quad.id]); // 象限任务投影写入当日列
+    expect('longAnchors' in view).toBe(false); // 悬浮代办长列已移除
   });
 
   it('quarter 档：每周一列，跨周完成聚合到对应周', () => {
@@ -119,8 +123,16 @@ describe('buildZoomView', () => {
   });
 
   it('year 档：每月一列，按月聚合', () => {
-    const a = makeTask({ horizon: 'today', createdAt: new Date(2026, 5, 3).getTime(), completedAt: new Date(2026, 5, 20).getTime() }); // 6 月
-    const b = makeTask({ horizon: 'today', createdAt: new Date(2026, 5, 3).getTime(), completedAt: day(0) }); // 8 月
+    const a = makeTask({
+      horizon: 'today',
+      createdAt: new Date(2026, 5, 3).getTime(),
+      completedAt: new Date(2026, 5, 20).getTime(),
+    }); // 6 月
+    const b = makeTask({
+      horizon: 'today',
+      createdAt: new Date(2026, 5, 3).getTime(),
+      completedAt: day(0),
+    }); // 8 月
     const view = buildZoomView([a, b], 'year', NOW);
     const months = view.columns.map((c) => new Date(c.start).getMonth());
     expect(months[0]).toBe(5);
@@ -129,8 +141,16 @@ describe('buildZoomView', () => {
   });
 
   it('years 档：每年一列，跨年聚合', () => {
-    const a = makeTask({ horizon: 'today', createdAt: new Date(2025, 7, 5).getTime(), completedAt: new Date(2025, 9, 11).getTime() }); // 2025
-    const b = makeTask({ horizon: 'today', createdAt: new Date(2025, 7, 5).getTime(), completedAt: day(0) }); // 2026
+    const a = makeTask({
+      horizon: 'today',
+      createdAt: new Date(2025, 7, 5).getTime(),
+      completedAt: new Date(2025, 9, 11).getTime(),
+    }); // 2025
+    const b = makeTask({
+      horizon: 'today',
+      createdAt: new Date(2025, 7, 5).getTime(),
+      completedAt: day(0),
+    }); // 2026
     const view = buildZoomView([a, b], 'years', NOW);
     expect(view.columns).toHaveLength(2);
     expect(new Date(view.columns[0].start).getFullYear()).toBe(2025);

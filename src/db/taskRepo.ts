@@ -1,5 +1,5 @@
 import { db } from '@/db/dexie';
-import type { Horizon, Task } from '@/types/task';
+import type { Horizon, Quadrant, Task } from '@/types/task';
 import { uuid } from '@/utils/id';
 
 /**
@@ -7,12 +7,18 @@ import { uuid } from '@/utils/id';
  * 只含存储副作用，不含业务决策（业务在 services/）。
  */
 export const taskRepo = {
-  async create(input: { title: string; horizon: Horizon; order: number }): Promise<Task> {
+  async create(input: {
+    title: string;
+    horizon: Horizon;
+    order: number;
+    quadrant?: Quadrant;
+  }): Promise<Task> {
     const now = Date.now();
     const task: Task = {
       id: uuid(),
       title: input.title,
       horizon: input.horizon,
+      ...(input.quadrant !== undefined ? { quadrant: input.quadrant } : {}),
       createdAt: now,
       updatedAt: now,
       order: input.order,
@@ -40,12 +46,12 @@ export const taskRepo = {
     await db.tasks.delete(id);
   },
 
-  /** 批量写入（演示数据填充用） */
+  /** 批量写入（初始种子数据填充用） */
   async bulkAdd(tasks: Task[]): Promise<void> {
     await db.tasks.bulkAdd(tasks);
   },
 
-  /** 按标签批量删除（演示数据清除用），返回删除条数 */
+  /** 按标签批量删除（初始种子数据清除用），返回删除条数 */
   async removeByTag(tag: string): Promise<number> {
     const ids = await db.tasks.filter((t) => t.tags?.includes(tag) ?? false).primaryKeys();
     await db.tasks.bulkDelete(ids);
@@ -56,8 +62,10 @@ export const taskRepo = {
     return db.tasks.get(id);
   },
 
-  /** 拖拽落点持久化：事务内批量写 order（跨模块时连同 horizon 一起写） */
-  async reorder(updates: Array<{ id: string; order: number; horizon?: Horizon }>): Promise<void> {
+  /** 拖拽落点持久化：事务内批量写 order（跨象限时连同 quadrant / horizon 映射一起写） */
+  async reorder(
+    updates: Array<{ id: string; order: number; quadrant?: Quadrant; horizon?: Horizon }>,
+  ): Promise<void> {
     if (updates.length === 0) return;
     const now = Date.now();
     await db.transaction('rw', db.tasks, async () => {
@@ -65,26 +73,8 @@ export const taskRepo = {
         updates.map((u) =>
           db.tasks.update(u.id, {
             order: u.order,
+            ...(u.quadrant !== undefined ? { quadrant: u.quadrant } : {}),
             ...(u.horizon !== undefined ? { horizon: u.horizon } : {}),
-            updatedAt: now,
-          }),
-        ),
-      );
-    });
-  },
-
-  /** 跨天滚存：今日且未完成 → 滚入短期并置顶（order 取 short 最小值之前） */
-  async rolloverTodayToShort(ids: string[]): Promise<void> {
-    if (ids.length === 0) return;
-    await db.transaction('rw', db.tasks, async () => {
-      const shortTasks = await db.tasks.where('horizon').equals('short').toArray();
-      const minOrder = Math.min(0, ...shortTasks.map((t) => t.order));
-      const now = Date.now();
-      await Promise.all(
-        ids.map((id, i) =>
-          db.tasks.update(id, {
-            horizon: 'short',
-            order: minOrder - ids.length + i,
             updatedAt: now,
           }),
         ),

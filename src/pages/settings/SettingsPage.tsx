@@ -3,8 +3,8 @@ import { Check } from 'lucide-react';
 import { listModels, testConnection } from '@/adapters/llm';
 import { testWebdav } from '@/adapters/webdav';
 import { exportBackup, parseBackup, restoreBackup } from '@/services/backupService';
-import { clearDemoTasks, seedDemoTasks } from '@/services/demoService';
-import { pullNow, pushNow, initSync } from '@/services/syncService';
+import { clearSeedTasks, seedIfEmpty } from '@/services/seedService';
+import { initSync, pullNow, pushNow } from '@/services/syncService';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -24,7 +24,7 @@ const MODES: { value: ThemeMode; label: string }[] = [
 
 /**
  * 设置页（§11 页面 4 / 方向稿 §10：分组列表式 + hairline 分隔）。
- * 主题 / LLM 配置（OpenAI 兼容，Key 只存本地）/ 数据（导出·导入 JSON）/ 演示数据。
+ * 主题 / LLM 配置（OpenAI 兼容，Key 只存本地）/ 数据（导出·导入 JSON）/ 初始数据。
  */
 export function SettingsPage() {
   const theme = useSettingsStore((s) => s.theme);
@@ -46,7 +46,7 @@ export function SettingsPage() {
   const [testingDav, setTestingDav] = useState(false);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [busyDemo, setBusyDemo] = useState(false);
+  const [busySeed, setBusySeed] = useState(false);
   const [confirmImport, setConfirmImport] = useState<{ text: string; count: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -106,21 +106,21 @@ export function SettingsPage() {
   };
 
   const handleSeed = async () => {
-    setBusyDemo(true);
+    setBusySeed(true);
     try {
-      const n = await seedDemoTasks();
-      showToast({ message: `已填充 ${n} 条演示数据` });
+      const n = await seedIfEmpty();
+      showToast({ message: n > 0 ? `已填充 ${n} 条初始待办` : '已有记录，未填充' });
     } finally {
-      setBusyDemo(false);
+      setBusySeed(false);
     }
   };
-  const handleClearDemo = async () => {
-    setBusyDemo(true);
+  const handleClearSeed = async () => {
+    setBusySeed(true);
     try {
-      const n = await clearDemoTasks();
-      showToast({ message: `已清除 ${n} 条演示数据` });
+      const n = await clearSeedTasks();
+      showToast({ message: `已清除 ${n} 条初始待办` });
     } finally {
-      setBusyDemo(false);
+      setBusySeed(false);
     }
   };
 
@@ -158,7 +158,9 @@ export function SettingsPage() {
                   key={value}
                   onClick={() => setStyle(value)}
                   className={`rounded-ctl border px-3 py-1 font-mono text-caption transition-colors ${
-                    theme.style === value ? 'border-accent text-accent' : 'border-line text-sub hover:text-ink'
+                    theme.style === value
+                      ? 'border-accent text-accent'
+                      : 'border-line text-sub hover:text-ink'
                   }`}
                 >
                   {label}
@@ -174,7 +176,9 @@ export function SettingsPage() {
                   key={value}
                   onClick={() => setMode(value)}
                   className={`rounded-ctl border px-3 py-1 font-mono text-caption transition-colors ${
-                    theme.mode === value ? 'border-accent text-accent' : 'border-line text-sub hover:text-ink'
+                    theme.mode === value
+                      ? 'border-accent text-accent'
+                      : 'border-line text-sub hover:text-ink'
                   }`}
                 >
                   {label}
@@ -183,7 +187,9 @@ export function SettingsPage() {
             </div>
           </div>
         </div>
-        <p className="mt-3 font-mono text-caption text-sub">宣纸 / 墨室 / 白页 / 黑场 · 偏好仅存本地，不同步</p>
+        <p className="mt-3 font-mono text-caption text-sub">
+          宣纸 / 墨室 / 白页 / 黑场 · 偏好仅存本地，不同步
+        </p>
       </section>
 
       {/* LLM 配置（2026-08-28 改版，参考 ccswitch 类主流接入：名称 + Base URL + Key + 获取模型多选） */}
@@ -253,7 +259,10 @@ export function SettingsPage() {
               const selected = llmDraft.selectedModels.includes(m);
               const active = llmDraft.activeModel === m;
               return (
-                <div key={m} className="flex h-10 items-center gap-3 border-b border-line px-3 last:border-b-0">
+                <div
+                  key={m}
+                  className="flex h-10 items-center gap-3 border-b border-line px-3 last:border-b-0"
+                >
                   <button
                     onClick={() =>
                       setLlmDraft({
@@ -271,7 +280,9 @@ export function SettingsPage() {
                     }
                     aria-label={`选择模型 ${m}`}
                     className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border transition-colors ${
-                      selected ? 'border-accent bg-accent text-surface' : 'border-line hover:border-sub'
+                      selected
+                        ? 'border-accent bg-accent text-surface'
+                        : 'border-line hover:border-sub'
                     }`}
                   >
                     {selected && <Check size={12} strokeWidth={3} />}
@@ -297,12 +308,14 @@ export function SettingsPage() {
         )}
         {llmDraft.models.length > 0 && (
           <p className="mt-2 font-mono text-caption text-sub">
-            已勾选 {llmDraft.selectedModels.length} 个模型 · 总结模型：{llmDraft.activeModel || '未选'}（点名称切换）
+            已勾选 {llmDraft.selectedModels.length} 个模型 · 总结模型：
+            {llmDraft.activeModel || '未选'}（点名称切换）
           </p>
         )}
         <p className="mt-3 font-mono text-caption leading-5 text-sub">
-          隐私提示：生成 AI 总结时，所选周期内的完成记录（标题、完成时间、模块来源）会发送给上述第三方模型服务；
-          API Key 只存在本机，不上传、不进导出文件。
+          隐私提示：生成 AI
+          总结时，所选周期内的完成记录（标题、完成时间、模块来源）会发送给上述第三方模型服务； API
+          Key 只存在本机，不上传、不进导出文件。
         </p>
       </section>
 
@@ -396,7 +409,9 @@ export function SettingsPage() {
             <button
               onClick={() => setDavDraft({ ...davDraft, enabled: !davDraft.enabled })}
               className={`rounded-full border px-4 py-1 font-mono text-caption transition-colors ${
-                davDraft.enabled ? 'border-accent text-accent' : 'border-line text-sub hover:text-ink'
+                davDraft.enabled
+                  ? 'border-accent text-accent'
+                  : 'border-line text-sub hover:text-ink'
               }`}
             >
               {davDraft.enabled ? '已启用' : '未启用'}
@@ -427,7 +442,9 @@ export function SettingsPage() {
           >
             {syncing ? '同步中…' : '立即同步'}
           </button>
-          {davTestResult && <span className="font-mono text-caption text-sub">{davTestResult}</span>}
+          {davTestResult && (
+            <span className="font-mono text-caption text-sub">{davTestResult}</span>
+          )}
         </div>
         <p className="mt-3 font-mono text-caption leading-5 text-sub">
           {lastSyncAt
@@ -438,41 +455,44 @@ export function SettingsPage() {
         </p>
       </section>
 
-      {/* 演示数据 */}
+      {/* 初始数据（四象限种子待办，seedService） */}
       <section className="mt-12">
-        <h2 className="font-mono text-caption text-sub">演示数据</h2>
+        <h2 className="font-mono text-caption text-sub">初始数据</h2>
         <div className="mt-2 divide-y divide-line border-y border-line">
           <div className="flex h-12 items-center justify-between">
-            <span className="text-body">填充 2025-08 至今的演示记录</span>
+            <span className="text-body">填充初始四象限待办（仅应用内无记录时写入）</span>
             <button
               onClick={handleSeed}
-              disabled={busyDemo}
+              disabled={busySeed}
               className="rounded-full border border-line px-4 py-1 font-mono text-caption text-sub transition-colors hover:text-ink disabled:opacity-40"
             >
               填充
             </button>
           </div>
           <div className="flex h-12 items-center justify-between">
-            <span className="text-body">清除全部演示记录</span>
+            <span className="text-body">清除全部初始待办</span>
             <button
-              onClick={handleClearDemo}
-              disabled={busyDemo}
+              onClick={handleClearSeed}
+              disabled={busySeed}
               className="rounded-full border border-accent px-4 py-1 font-mono text-caption text-accent transition-opacity hover:opacity-70 disabled:opacity-40"
             >
               清除
             </button>
           </div>
         </div>
-        <p className="mt-3 font-mono text-caption text-sub">演示记录带 demo 标签，清除不影响真实数据</p>
+        <p className="mt-3 font-mono text-caption text-sub">
+          初始待办带 seed 标签，清除不影响手动录入的记录
+        </p>
       </section>
 
       {/* 导入还原：危险操作二次确认（方向稿 §10） */}
       {confirmImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-6">
-          <div className="max-w-md rounded-card border border-line bg-surface p-6 shadow-[var(--shadow-float)]">
+          <div className="max-w-md rounded-card border border-line bg-surface p-6 [box-shadow:var(--shadow-float)]">
             <h4 className="font-display text-title">确认还原？</h4>
             <p className="mt-3 text-body leading-7">
-              备份包含 {confirmImport.count} 条记录。还原会<strong>清空当前全部数据</strong>再写回，此操作不可撤销。
+              备份包含 {confirmImport.count} 条记录。还原会<strong>清空当前全部数据</strong>
+              再写回，此操作不可撤销。
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button

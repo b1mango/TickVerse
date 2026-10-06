@@ -2,24 +2,26 @@ import { useEffect } from 'react';
 import { BarChart3, PenLine, Ruler, Settings } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { Toast } from '@/components/ui/Toast';
-import { rolloverOnLaunch } from '@/services/rolloverService';
+import { seedOnLaunch } from '@/services/seedService';
 import { initSync } from '@/services/syncService';
-import { useTaskStore } from '@/stores/taskStore';
 import { useUiStore } from '@/stores/uiStore';
 
 const NAV = [
-  { to: '/', label: '编辑', icon: PenLine },
+  { to: '/', label: '代办', icon: PenLine },
   { to: '/timeline', label: '时间轴', icon: Ruler },
   { to: '/stats', label: '统计', icon: BarChart3 },
   { to: '/settings', label: '设置', icon: Settings },
 ] as const;
 
-/** 应用壳：启动滚存检测 + 四页路由出口 + 底部导航（Lucide 图标 + mono 小字，当前项朱砂） */
+/** 应用壳：启动种子检测 + 四页路由出口 + 底部导航（Lucide 图标 + mono 小字，当前项朱砂） */
 function App() {
-  const setRolledOverIds = useTaskStore((s) => s.setRolledOverIds);
-
   useEffect(() => {
-    void rolloverOnLaunch().then(setRolledOverIds);
+    // 初始种子待办（四象限）：本机首次启动且库为空时写入
+    void seedOnLaunch().then((n) => {
+      if (n > 0) {
+        useUiStore.getState().showToast({ message: `已写入 ${n} 条初始待办 → 四象限` });
+      }
+    });
     // WebDAV 快照同步（清单 M5-4）：启用时打开拉取一次，本地变更防抖推送
     initSync();
     // 浏览器数据防清理（清单 M5-3）：申请持久存储，被拒则提示定期导出备份
@@ -34,7 +36,7 @@ function App() {
         }
       })
       .catch(() => {});
-  }, [setRolledOverIds]);
+  }, []);
 
   return (
     <div className="min-h-screen">

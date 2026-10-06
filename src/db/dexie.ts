@@ -10,7 +10,7 @@ export class TickVerseDB extends Dexie {
   constructor() {
     super('tickverse');
     this.version(1).stores({
-      // 索引：horizon（编辑页分模块）、completedAt（时间轴落位）、updatedAt（同步合并）
+      // 索引：horizon（历史遗留查询维度，三档清单已下线）、completedAt（时间轴落位）、updatedAt（同步合并）
       tasks: 'id, horizon, completedAt, updatedAt',
     });
     this.version(2).stores({

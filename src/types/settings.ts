@@ -70,37 +70,19 @@ export const DEFAULT_WEBDAV: WebdavConfig = {
 };
 
 /**
- * 记录页布局偏好：竖向（默认）/ 横向 / 左今右分 / 自定义拖拽。
- * 与主题一样只存 localStorage，不进 WebDAV 同步文件。
+ * 四象限模块版式偏好：columns 四列（auto-fit 响应式，宽容器一行四列 / 窄容器自动降级）
+ * / grid 四象限（固定 2x2 宫格）。与主题一样只存 localStorage，不进 WebDAV 同步文件。
  */
-export type EditorLayoutMode = 'vertical' | 'horizontal' | 'split' | 'custom';
+export type QuadrantLayoutMode = 'columns' | 'grid';
 
-export type EditorModuleKey = 'today' | 'short' | 'long';
+export const QUADRANT_LAYOUT_STORAGE_KEY = 'tickverse.quadrantLayout';
 
-/** 自定义模式单模块摆位：画布坐标 + 宽度（px，宽度约束见 editorLayout.ts） */
-export interface EditorModulePlacement {
-  x: number;
-  y: number;
-  w: number;
-}
+export const DEFAULT_QUADRANT_LAYOUT: QuadrantLayoutMode = 'columns';
 
-export interface EditorLayoutPreference {
-  mode: EditorLayoutMode;
-  /** 自定义模式下三模块的画布坐标与宽度（px，相对画布左上角；老数据无 w 时读取迁移回退默认宽） */
-  custom: Record<EditorModuleKey, EditorModulePlacement>;
-}
+/** 四列版式下列宽的 flex-grow 比例（4 项，拖列间分隔条调节；仅存 localStorage） */
+export const QUADRANT_WIDTHS_STORAGE_KEY = 'tickverse.quadrantWidths';
 
-export const EDITOR_LAYOUT_STORAGE_KEY = 'tickverse.editorLayout';
-
-/** 默认摆位：横向三连（模块宽 360 + 24 间距，与 editorLayout.ts 的默认一致） */
-export const DEFAULT_EDITOR_LAYOUT: EditorLayoutPreference = {
-  mode: 'vertical',
-  custom: {
-    today: { x: 0, y: 0, w: 360 },
-    short: { x: 384, y: 0, w: 360 },
-    long: { x: 768, y: 0, w: 360 },
-  },
-};
+export const DEFAULT_QUADRANT_COLUMN_WIDTHS: readonly number[] = [1, 1, 1, 1];
 
 /** 常用服务商预设（清单 M5-4：坚果云 / 自有 NAS） */
 export const WEBDAV_PRESETS = [
