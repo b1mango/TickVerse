@@ -173,7 +173,7 @@ fn constrain_widget_frame(
 
   if let Some(direction) = direction {
     if direction.west() {
-      let right_anchor = (x + width).clamp(bounds.left + next_width, bounds.right);
+      let right_anchor = (x + width).clamp(bounds.left + min_width, bounds.right);
       next_width = width.max(min_width).min(right_anchor - bounds.left);
       next_x = right_anchor - next_width;
     } else if direction.east() {
@@ -270,7 +270,7 @@ fn widget_set_frame(
   height: f64,
   direction: String,
 ) -> Result<(), String> {
-  if ![x, y, width, height].iter().all(|v| v.is_finite()) || width <= 0.0 || height <= 0.0 {
+  if ![x, y, width, height].iter().all(|v| v.is_finite()) {
     return Err("组件 frame 参数无效".to_string());
   }
   let resize_direction = WidgetResizeDirection::parse(&direction);
@@ -502,8 +502,8 @@ impl SnapRect {
   }
 
   fn overlap_area(&self, o: &SnapRect) -> f64 {
-    (self.x.min(o.x + o.w) - self.x.max(o.x)).max(0.0)
-      * (self.y.min(o.y + o.h) - self.y.max(o.y)).max(0.0)
+    ((self.x + self.w).min(o.x + o.w) - self.x.max(o.x)).max(0.0)
+      * ((self.y + self.h).min(o.y + o.h) - self.y.max(o.y)).max(0.0)
   }
 }
 
@@ -527,14 +527,6 @@ impl SnapBounds {
   fn clamp(&self, x: f64, y: f64) -> (f64, f64) {
     (x.clamp(self.left, self.right), y.clamp(self.top, self.bottom))
   }
-}
-
-#[derive(Clone, Copy)]
-struct SnapCandidate {
-  x: f64,
-  y: f64,
-  distance: f64,
-  priority: u8,
 }
 
 /// 平台无关的边距读取（非 macOS 恒 0 → 常量边距生效）
@@ -583,129 +575,55 @@ fn snap_window(w: &tauri::WebviewWindow) {
     return;
   }
 
-  let (cx, cy) = bounds.clamp(px, py);
-  let current = SnapRect {
-    x: px,
-    y: py,
-    w: ww,
-    h: wh,
-  };
   let obstacles = native_widget_frames();
-  let overlaps_obstacle = obstacles.iter().any(|o| current.intersects(o));
-  let mut candidates = Vec::new();
-
-  // 候选先钳回可见区，再检查是否压住任何原生组件。这样原生组件靠近屏幕边缘时，
-  // 另一侧候选不会因坐标越界被整组丢弃，最终也不会回退到重叠位置。
-  let mut add_candidate = |x: f64, y: f64, force: bool, priority: u8| {
-    let (x, y) = bounds.clamp(x, y);
-    let candidate = SnapRect { x, y, w: ww, h: wh };
-    if !bounds.contains(x, y) || obstacles.iter().any(|o| candidate.intersects(o)) {
-      return;
-    }
-    let distance = (x - px).hypot(y - py);
-    if force || distance <= SNAP_THRESHOLD {
-      candidates.push(SnapCandidate { x, y, distance, priority });
-    }
-  };
-
-  let near_left = px - bounds.left <= SNAP_THRESHOLD;
-  let near_right = bounds.right - px <= SNAP_THRESHOLD;
-  let near_top = py - bounds.top <= SNAP_THRESHOLD;
-  let near_bottom = bounds.bottom - py <= SNAP_THRESHOLD;
-  if near_left || px < bounds.left {
-    add_candidate(bounds.left, cy, true, 2);
-  }
-  if near_right || px > bounds.right {
-    add_candidate(bounds.right, cy, true, 2);
-  }
-  if near_top || py < bounds.top {
-    add_candidate(cx, bounds.top, true, 2);
-  }
-  if near_bottom || py > bounds.bottom {
-    add_candidate(cx, bounds.bottom, true, 2);
-  }
-  if (near_left || px < bounds.left) && (near_top || py < bounds.top) {
-    add_candidate(bounds.left, bounds.top, true, 2);
-  }
-  if (near_left || px < bounds.left) && (near_bottom || py > bounds.bottom) {
-    add_candidate(bounds.left, bounds.bottom, true, 2);
-  }
-  if (near_right || px > bounds.right) && (near_top || py < bounds.top) {
-    add_candidate(bounds.right, bounds.top, true, 2);
-  }
-  if (near_right || px > bounds.right) && (near_bottom || py > bounds.bottom) {
-    add_candidate(bounds.right, bounds.bottom, true, 2);
-  }
-
-  // 原生组件候选围绕其真实四条边生成：左右相邻保留松手时的 y，上下相邻保留 x，
-  // 同时补上顶/底对齐，便于大组件在任意高度弹到最近的空位。
-  for obstacle in &obstacles {
-    let horizontal_overlap = px < obstacle.x + obstacle.w && obstacle.x < px + ww;
-    let near_obstacle_bottom = (py - (obstacle.y + obstacle.h)).abs() <= SNAP_THRESHOLD;
-    let near_obstacle_top = (py + wh - obstacle.y).abs() <= SNAP_THRESHOLD;
-    let horizontal_y = [
-      cy,
-      obstacle.y,
-      (obstacle.y + obstacle.h - wh).clamp(bounds.top, bounds.bottom),
-    ];
-    let vertical_x = [
-      cx,
-      obstacle.x,
-      (obstacle.x + obstacle.w - ww).clamp(bounds.left, bounds.right),
-    ];
-    let right_x = obstacle.x + obstacle.w + SNAP_GAP;
-    let left_x = obstacle.x - ww - SNAP_GAP;
-    let bottom_y = obstacle.y + obstacle.h + SNAP_GAP;
-    let top_y = obstacle.y - wh - SNAP_GAP;
-    let horizontal_near = (px - right_x).abs() <= SNAP_THRESHOLD
-      || (px - left_x).abs() <= SNAP_THRESHOLD
-      || (horizontal_overlap && (near_obstacle_bottom || near_obstacle_top))
-      || overlaps_obstacle;
-    let vertical_near = (py - bottom_y).abs() <= SNAP_THRESHOLD
-      || (py - top_y).abs() <= SNAP_THRESHOLD
-      || overlaps_obstacle;
-
-    if horizontal_near {
-      for y in horizontal_y {
-        add_candidate(right_x, y, true, 0);
-        add_candidate(left_x, y, true, 0);
-      }
-    }
-    if vertical_near {
-      for x in vertical_x {
-        add_candidate(x, bottom_y, true, 1);
-        add_candidate(x, top_y, true, 1);
-      }
-    }
-  }
-
-  let target = candidates
-    .into_iter()
-    .min_by(|a, b| {
-      a.priority
-        .cmp(&b.priority)
-        .then_with(|| a.distance.total_cmp(&b.distance))
-    })
-    .map(|candidate| (candidate.x, candidate.y))
-    .unwrap_or((cx, cy));
-
-  let target_rect = SnapRect {
-    x: target.0,
-    y: target.1,
-    w: ww,
-    h: wh,
-  };
-  let (tx, ty) = if obstacles.iter().any(|o| target_rect.intersects(o)) {
-    // 组件过大、所有真实边缘都放不下时才进入兜底；主路径没有网格跳跃。
-    least_overlap_position(cx, cy, ww, wh, bounds, &obstacles)
-  } else {
-    target
-  };
-
-  // 单次 set_position：多步动画会连续触发 Moved，从而再次排队吸附并造成乱跳。
-  if (tx - px).abs() + (ty - py).abs() >= 3.0 {
+  let (tx, ty) = snap_target(px, py, ww, wh, bounds, &obstacles);
+  if (tx - px).abs() + (ty - py).abs() >= 0.5 {
     let _ = w.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: tx, y: ty }));
   }
+}
+
+/// Only collide with real rectangles; proximity is local on both axes.
+fn snap_target(px: f64, py: f64, ww: f64, wh: f64, bounds: SnapBounds, obstacles: &[SnapRect]) -> (f64, f64) {
+  let (cx, cy) = bounds.clamp(px, py);
+  let overlaps = |x, y| obstacles.iter().any(|o| (SnapRect { x, y, w: ww, h: wh }).intersects(o));
+  if overlaps(cx, cy) {
+    return least_overlap_position(cx, cy, ww, wh, bounds, obstacles);
+  }
+  let mut xs = vec![cx];
+  let mut ys = vec![cy];
+  for x in [bounds.left, bounds.right] {
+    if (x - cx).abs() <= SNAP_THRESHOLD { xs.push(x); }
+  }
+  for y in [bounds.top, bounds.bottom] {
+    if (y - cy).abs() <= SNAP_THRESHOLD { ys.push(y); }
+  }
+  for o in obstacles {
+    if cy < o.y + o.h && o.y < cy + wh {
+      for x in [o.x - ww - SNAP_GAP, o.x + o.w + SNAP_GAP] {
+        if (x - cx).abs() <= SNAP_THRESHOLD && bounds.contains(x, cy) { xs.push(x); }
+      }
+    }
+    if cx < o.x + o.w && o.x < cx + ww {
+      for y in [o.y - wh - SNAP_GAP, o.y + o.h + SNAP_GAP] {
+        if (y - cy).abs() <= SNAP_THRESHOLD && bounds.contains(cx, y) { ys.push(y); }
+      }
+    }
+  }
+  // Snap nearby axes together; never prefer a remote component over the drop position.
+  let mut target = (cx, cy);
+  let mut best = (0, f64::INFINITY);
+  for x in xs {
+    for &y in &ys {
+      if overlaps(x, y) { continue; }
+      let axes = i32::from(x != cx) + i32::from(y != cy);
+      let distance = (x - cx).hypot(y - cy);
+      if axes > best.0 || (axes == best.0 && distance < best.1) {
+        best = (axes, distance);
+        target = (x, y);
+      }
+    }
+  }
+  target
 }
 
 /// 只有当窗口已经压住原生组件且所有真实边缘候选都放不下时才启用的兜底搜索。
@@ -724,43 +642,13 @@ fn least_overlap_position(
     (overlap, (x - x0).hypot(y - y0))
   };
   let initial = bounds.clamp(x0, y0);
-  let mut points = vec![initial, (bounds.left, bounds.top), (bounds.left, bounds.bottom), (bounds.right, bounds.top), (bounds.right, bounds.bottom)];
-
-  // 把每个原生组件的四条外侧边投影到可见区；普通尺寸组件通常在这里就能找到
-  // 完全不重叠的位置，避免旧版只搜索当前点周围 240px 而仍压住左侧组件。
-  for obstacle in obstacles {
-    let xs = [
-      obstacle.x - ww - SNAP_GAP,
-      obstacle.x + obstacle.w + SNAP_GAP,
-      obstacle.x,
-      obstacle.x + obstacle.w - ww,
-    ];
-    let ys = [
-      obstacle.y - wh - SNAP_GAP,
-      obstacle.y + obstacle.h + SNAP_GAP,
-      obstacle.y,
-      obstacle.y + obstacle.h - wh,
-    ];
-    for x in xs {
-      for y in ys {
-        points.push(bounds.clamp(x, y));
-      }
-    }
+  let mut xs = vec![initial.0, bounds.left, bounds.right];
+  let mut ys = vec![initial.1, bounds.top, bounds.bottom];
+  for o in obstacles {
+    xs.extend([o.x - ww - SNAP_GAP, o.x + o.w + SNAP_GAP]);
+    ys.extend([o.y - wh - SNAP_GAP, o.y + o.h + SNAP_GAP]);
   }
-
-  // 临界边投影仍可能被多个组件共同挡住时，用稀疏全域搜索保证只要存在空位就能找到。
-  let step = 24.0;
-  let x_count = ((bounds.right - bounds.left) / step).ceil() as i32;
-  let y_count = ((bounds.bottom - bounds.top) / step).ceil() as i32;
-  for ix in 0..=x_count {
-    for iy in 0..=y_count {
-      points.push((
-        (bounds.left + f64::from(ix) * step).min(bounds.right),
-        (bounds.top + f64::from(iy) * step).min(bounds.bottom),
-      ));
-    }
-  }
-
+  let points = xs.into_iter().flat_map(|x| ys.iter().map(move |&y| bounds.clamp(x, y)));
   let mut best = (score(initial.0, initial.1), initial);
   for point in points {
     let candidate = (score(point.0, point.1), point);
@@ -798,7 +686,7 @@ fn native_widget_frames() -> Vec<SnapRect> {
   let own_pid = std::process::id();
   type CFDict = CFDictionary<*const std::ffi::c_void, *const std::ffi::c_void>;
   // bounds 子词典的四键（X/Y/Width/Height -> CFNumber）
-  let num_key = |s: &str| CFString::new(s).as_concrete_TypeRef() as *const std::ffi::c_void;
+  let bounds_keys = ["X", "Y", "Width", "Height"].map(CFString::new);
   let read_num = |dict: &CFDict, key: *const std::ffi::c_void| -> Option<f64> {
     let ptr = *dict.find(key)?;
     if ptr.is_null() {
@@ -842,10 +730,10 @@ fn native_widget_frames() -> Vec<SnapRect> {
     };
     let bounds = unsafe { CFDict::wrap_under_get_rule(*bounds_ref as CFDictionaryRef) };
     let (Some(x), Some(y), Some(w), Some(h)) = (
-      read_num(&bounds, num_key("X")),
-      read_num(&bounds, num_key("Y")),
-      read_num(&bounds, num_key("Width")),
-      read_num(&bounds, num_key("Height")),
+      read_num(&bounds, bounds_keys[0].as_concrete_TypeRef() as *const std::ffi::c_void),
+      read_num(&bounds, bounds_keys[1].as_concrete_TypeRef() as *const std::ffi::c_void),
+      read_num(&bounds, bounds_keys[2].as_concrete_TypeRef() as *const std::ffi::c_void),
+      read_num(&bounds, bounds_keys[3].as_concrete_TypeRef() as *const std::ffi::c_void),
     ) else {
       continue;
     };
@@ -928,6 +816,25 @@ mod tests {
       right: 1440.0,
       top: 1000.0,
     }
+  }
+
+  #[test]
+  fn widget_can_move_up_below_native_widgets_and_down_on_right() {
+    let obstacles = [SnapRect { x: 2.0, y: 35.0, w: 552.0, h: 192.0 }];
+    let b = SnapBounds { left: 16.0, top: 41.0, right: 856.0, bottom: 412.0 };
+    assert_eq!(snap_target(16.0, 270.0, 640.0, 480.0, b, &obstacles), (16.0, 270.0));
+    assert_eq!(snap_target(856.0, 410.0, 640.0, 480.0, b, &obstacles), (856.0, 412.0));
+    let (x, y) = snap_target(16.0, 100.0, 640.0, 480.0, b, &obstacles);
+    assert!(!(SnapRect { x, y, w: 640.0, h: 480.0 }).intersects(&obstacles[0]));
+    assert_eq!(snap_target(x, y, 640.0, 480.0, b, &obstacles), (x, y));
+  }
+
+  #[test]
+  fn overlap_area_is_positive_and_symmetric() {
+    let a = SnapRect { x: 0.0, y: 0.0, w: 100.0, h: 100.0 };
+    let b = SnapRect { x: 50.0, y: 50.0, w: 100.0, h: 100.0 };
+    assert_eq!(a.overlap_area(&b), 2500.0);
+    assert_eq!(b.overlap_area(&a), 2500.0);
   }
 
   #[test]

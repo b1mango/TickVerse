@@ -19,7 +19,7 @@ import { THEME_STORAGE_KEY, WIDGET_FONT_BASE_PX, WIDGET_STORAGE_KEY } from '@/ty
 /**
  * 边框全域调尺寸（2026-10-07 修订十六）：四边四角 8 条透明热区。
  * macOS 侧用 AppKit 原生 frame 一次性更新原点与尺寸，避免 tao 的 set_size/set_position
- * 异步竞态；指针增量乘 zoom 还原为逻辑像素，尺寸落盘走既有 onResized 防抖。
+ * 异步竞态；屏幕坐标增量不受窗口移动和 CSS zoom 影响，尺寸落盘走既有 onResized 防抖。
  */
 const RESIZE_HANDLES: readonly { dir: WidgetResizeDirection; className: string }[] = [
   // 边热区 12px、角热区 20px（8px 实测命中率低，"下方有时候拉不动"）
@@ -33,20 +33,15 @@ const RESIZE_HANDLES: readonly { dir: WidgetResizeDirection; className: string }
   { dir: 'SouthWest', className: 'left-0 bottom-0 h-5 w-5 cursor-sw-resize' },
 ];
 
-/** 与 tauri.conf.json 的 minWidth/minHeight 对齐 */
-const MIN_W = 460;
-const MIN_H = 340;
-
 function startResize(dir: WidgetResizeDirection, onResizeState: (active: boolean) => void) {
   return (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
-    const zoom = useSettingsStore.getState().widget.font / WIDGET_FONT_BASE_PX;
-    const startClient = { x: e.clientX, y: e.clientY };
+    const startClient = { x: e.screenX, y: e.screenY };
     type NativeFrame = Awaited<ReturnType<typeof beginWidgetResize>>;
     let startFrame: NativeFrame | null = null;
-    let latestPoint = { x: e.clientX, y: e.clientY };
+    let latestPoint = { x: e.screenX, y: e.screenY };
     let latestFrame: NativeFrame | null = null;
     let writing = false;
     let ended = false;
@@ -82,8 +77,8 @@ function startResize(dir: WidgetResizeDirection, onResizeState: (active: boolean
 
     const updateFrame = (point: { x: number; y: number }) => {
       if (!startFrame) return;
-      const dx = (point.x - startClient.x) * zoom;
-      const dy = (point.y - startClient.y) * zoom;
+      const dx = point.x - startClient.x;
+      const dy = point.y - startClient.y;
       let { width, height, x, y } = startFrame;
       if (dir.includes('East')) width = startFrame.width + dx;
       if (dir.includes('West')) {
@@ -99,15 +94,15 @@ function startResize(dir: WidgetResizeDirection, onResizeState: (active: boolean
       latestFrame = {
         x: Math.round(x),
         y: Math.round(y),
-        width: Math.max(MIN_W, Math.round(width)),
-        height: Math.max(MIN_H, Math.round(height)),
+        width: Math.round(width),
+        height: Math.round(height),
       };
       void flush();
     };
 
     const move = (ev: PointerEvent) => {
       if (ended) return;
-      latestPoint = { x: ev.clientX, y: ev.clientY };
+      latestPoint = { x: ev.screenX, y: ev.screenY };
       updateFrame(latestPoint);
     };
 
@@ -203,8 +198,8 @@ export function WidgetApp() {
 
   return (
     <div
-      className="relative flex h-screen flex-col overflow-hidden p-2"
-      style={{ zoom: font / WIDGET_FONT_BASE_PX }}
+      className="relative flex flex-col overflow-hidden p-2"
+      style={{ zoom: font / WIDGET_FONT_BASE_PX, height: `calc(100dvh / ${font / WIDGET_FONT_BASE_PX})` }}
     >
       {/* 拖动条（data-tauri-drag-region）：仅此条可拖窗；双击复位默认尺寸（2026-10-07 修订十三） */}
       <header className="flex h-7 shrink-0 select-none items-center">

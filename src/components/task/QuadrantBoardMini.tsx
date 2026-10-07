@@ -53,7 +53,7 @@ interface WidgetColumnProps {
   onRename: (id: string, title: string) => void;
 }
 
-/** 紧凑象限列卡：半透明 + 毛玻璃浮于桌面；不定高，随窗口拉伸、列内纵滚 */
+/** 紧凑象限列卡：实色卡片，透明度统一由窗口设置控制；不定高，随窗口拉伸、列内纵滚 */
 function WidgetColumn({
   meta,
   tasks,
@@ -78,7 +78,7 @@ function WidgetColumn({
   return (
     <section
       ref={setNodeRef}
-      className={`flex min-h-0 flex-col rounded-card border bg-surface/85 p-2.5 backdrop-blur-md border-t-2 [box-shadow:var(--shadow-float)] ${stripe} ${
+      className={`flex min-h-0 flex-col rounded-card border bg-surface p-2.5 border-t-2 [box-shadow:var(--shadow-float)] ${stripe} ${
         highlight ? 'border-accent/60' : 'border-line'
       } transition-colors duration-[var(--dur-fast)]`}
     >
