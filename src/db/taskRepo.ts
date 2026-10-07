@@ -27,6 +27,17 @@ export const taskRepo = {
     return task;
   },
 
+  /** Serialized across windows: new tasks always precede the persisted first item. */
+  async prepend(input: { title: string; quadrant: Quadrant; horizon: Horizon }): Promise<Task> {
+    return db.transaction('rw', db.tasks, async () => {
+      const siblings = await db.tasks
+        .filter((t) => t.quadrant === input.quadrant && t.completedAt === undefined)
+        .toArray();
+      const order = siblings.reduce((min, task) => Math.min(min, task.order), 0) - 1;
+      return taskRepo.create({ ...input, order });
+    });
+  },
+
   /** 恢复一个曾被删除的任务（toast 撤销用，原样写回） */
   async restore(task: Task): Promise<void> {
     await db.tasks.put(task);

@@ -6,6 +6,7 @@ import type { Task } from '@/types/task';
 
 interface SortableTaskItemProps {
   task: Task;
+  shift?: number;
   /** 落点指示线：above = 条目上方 / below = 条目下方（box-shadow 实现，不引起布局位移） */
   indicator?: 'above' | 'below';
   onComplete: (id: string) => void;
@@ -21,6 +22,7 @@ const SORT_TRANSITION_MS = 200;
 /** 可拖拽条目壳（§15-2 dnd-kit）：位移/重排交给 sortable，条目本身保持纯渲染 */
 export function SortableTaskItem({
   task,
+  shift = 0,
   indicator,
   onComplete,
   onDelete,
@@ -42,7 +44,7 @@ export function SortableTaskItem({
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Transform.toString(transform),
+        transform: shift ? `translateY(${shift}px)` : CSS.Transform.toString(transform),
         transition,
         boxShadow:
           indicator === 'above'
@@ -53,7 +55,7 @@ export function SortableTaskItem({
       }}
       {...attributes}
       {...listeners}
-      className={isDragging && dimWhenDragging ? 'opacity-30' : ''}
+      className={isDragging ? (dimWhenDragging ? 'opacity-30' : 'invisible') : ''}
     >
       <TaskItem task={task} onComplete={onComplete} onDelete={onDelete} onRename={onRename} />
     </div>

@@ -16,7 +16,7 @@ export class EditingSafePointerSensor extends PointerSensor {
         { onActivation }: PointerSensorOptions,
       ): boolean => {
         const target = nativeEvent.target as HTMLElement | null;
-        if (target?.closest('textarea, input, [contenteditable="true"]')) return false;
+        if (target?.closest('button, a, textarea, input, [contenteditable="true"]')) return false;
         if (!nativeEvent.isPrimary || nativeEvent.button !== 0) return false;
         onActivation?.({ event: nativeEvent });
         return true;

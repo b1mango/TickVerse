@@ -44,15 +44,13 @@ export function planQuadrantMove(
  * 单向数据流：UI 事件 → service → repo → useLiveQuery 驱动 UI（§15-4）。
  */
 export const taskService = {
-  /** 追加任务到象限末尾（order = 现有最大值 + 1，horizon 由象限映射） */
-  async addQuadrantTask(title: string, quadrant: Quadrant, siblings: Task[]): Promise<Task> {
+  /** 新增任务置顶，顺序在数据库事务内计算，避免两窗口同时录入顺序冲突 */
+  async addQuadrantTask(title: string, quadrant: Quadrant): Promise<Task> {
     const trimmed = title.trim();
     if (!trimmed) throw new Error('标题不能为空');
-    const maxOrder = Math.max(0, ...siblings.map((t) => t.order));
-    return taskRepo.create({
+    return taskRepo.prepend({
       title: trimmed,
       horizon: QUADRANT_HORIZON[quadrant],
-      order: maxOrder + 1,
       quadrant,
     });
   },

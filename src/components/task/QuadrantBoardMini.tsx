@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragOverlay,
@@ -6,9 +7,6 @@ import {
   useDroppable,
   useSensor,
   useSensors,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -20,6 +18,7 @@ import type { LucideIcon } from 'lucide-react';
 import { EditingSafePointerSensor } from '@/components/task/EditingSafePointerSensor';
 import { SortableTaskItem } from '@/components/task/SortableTaskItem';
 import { TaskItem } from '@/components/task/TaskItem';
+import { taskCollision, useTaskDrag } from '@/hooks/useTaskDrag';
 import { useQuadrantTasks } from '@/hooks/useTasks';
 import { taskService } from '@/services/taskService';
 import { useUiStore } from '@/stores/uiStore';
@@ -47,6 +46,8 @@ interface WidgetColumnProps {
   overId: string | null;
   activeId: string | null;
   highlight: boolean;
+  after: boolean;
+  insertion?: { index: number; height: number };
   onAdd: (title: string, quadrant: Quadrant) => void;
   onComplete: (id: string) => void;
   onDelete: (id: string) => void;
@@ -60,6 +61,8 @@ function WidgetColumn({
   overId,
   activeId,
   highlight,
+  after,
+  insertion,
   onAdd,
   onComplete,
   onDelete,
@@ -70,7 +73,7 @@ function WidgetColumn({
   const { setNodeRef } = useDroppable({ id, data: { quadrant: id } });
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter' || !draft.trim()) return;
+    if (e.nativeEvent.isComposing || e.key !== 'Enter' || !draft.trim()) return;
     onAdd(draft, id);
     setDraft('');
   };
@@ -96,10 +99,13 @@ function WidgetColumn({
           {tasks.map((task, i) => (
             <SortableTaskItem
               key={task.id}
+              shift={insertion && i >= insertion.index ? insertion.height : 0}
               task={task}
               indicator={
                 overId === task.id && activeId !== task.id
-                  ? 'above'
+                  ? after
+                    ? 'below'
+                    : 'above'
                   : overId === id && activeId !== task.id && i === tasks.length - 1
                     ? 'below'
                     : undefined
@@ -132,9 +138,6 @@ function WidgetColumn({
  */
 export function QuadrantBoardMini() {
   const quadrantTasks = useQuadrantTasks();
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
-  const [overQuadrant, setOverQuadrant] = useState<Quadrant | null>(null);
 
   const tasksByQuadrant: Record<Quadrant, Task[]> = { q1: [], q2: [], q3: [], q4: [] };
   for (const t of quadrantTasks) {
@@ -147,7 +150,7 @@ export function QuadrantBoardMini() {
   );
 
   const handleAdd = (title: string, quadrant: Quadrant) => {
-    void taskService.addQuadrantTask(title, quadrant, tasksByQuadrant[quadrant]);
+    void taskService.addQuadrantTask(title, quadrant);
   };
   const handleComplete = (id: string) => {
     void taskService.completeTask(id);
@@ -166,45 +169,28 @@ export function QuadrantBoardMini() {
     void taskService.renameTask(id, title);
   };
 
-  const findTask = (quadrant: Quadrant | undefined, id: string | number): Task | null =>
-    quadrant ? (tasksByQuadrant[quadrant].find((t) => t.id === id) ?? null) : null;
-
-  const handleDragStart = ({ active }: DragStartEvent) => {
-    setActiveTask(findTask(active.data.current?.quadrant as Quadrant | undefined, active.id));
-  };
-  const handleDragOver = ({ over }: DragOverEvent) => {
-    setOverId(over ? String(over.id) : null);
-    setOverQuadrant(over ? ((over.data.current?.quadrant ?? over.id) as Quadrant) : null);
-  };
-  const handleDragCancel = () => {
-    setActiveTask(null);
-    setOverId(null);
-    setOverQuadrant(null);
-  };
-  const handleDragEnd = ({ active, over }: DragEndEvent) => {
-    setActiveTask(null);
-    setOverId(null);
-    setOverQuadrant(null);
-    if (!over || active.id === over.id) return;
-
-    const from = active.data.current?.quadrant as Quadrant | undefined;
-    if (!from) return;
-    const to = (over.data.current?.quadrant ?? over.id) as Quadrant;
-    const targetRest = tasksByQuadrant[to].filter((t) => t.id !== active.id);
-    const overIndex = targetRest.findIndex((t) => t.id === over.id);
-    void taskService.moveQuadrantTask(tasksByQuadrant, {
-      id: String(active.id),
-      from,
-      to,
-      toIndex: overIndex === -1 ? targetRest.length : overIndex,
-    });
-  };
+  const {
+    activeTask,
+    overId,
+    overQuadrant,
+    after,
+    target,
+    dragHeight,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+    handleDragCancel,
+  } = useTaskDrag(tasksByQuadrant, (move) => {
+    void taskService.moveQuadrantTask(tasksByQuadrant, move);
+  });
 
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={taskCollision}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
+        onDragMove={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
@@ -217,6 +203,12 @@ export function QuadrantBoardMini() {
             overId={overId}
             activeId={activeTask?.id ?? null}
             highlight={overQuadrant === meta.id}
+            after={after}
+            insertion={
+              target?.to === meta.id && target.from !== target.to
+                ? { index: target.toIndex, height: dragHeight }
+                : undefined
+            }
             onAdd={handleAdd}
             onComplete={handleComplete}
             onDelete={handleDelete}
@@ -225,17 +217,20 @@ export function QuadrantBoardMini() {
         ))}
       </div>
 
-      <DragOverlay>
-        {activeTask ? (
-          <TaskItem
-            task={activeTask}
-            overlay
-            onComplete={() => {}}
-            onDelete={() => {}}
-            onRename={() => {}}
-          />
-        ) : null}
-      </DragOverlay>
+      {createPortal(
+        <DragOverlay dropAnimation={null}>
+          {activeTask ? (
+            <TaskItem
+              task={activeTask}
+              overlay
+              onComplete={() => {}}
+              onDelete={() => {}}
+              onRename={() => {}}
+            />
+          ) : null}
+        </DragOverlay>,
+        document.body,
+      )}
     </DndContext>
   );
 }

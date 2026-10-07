@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragOverlay,
@@ -6,9 +7,6 @@ import {
   useDroppable,
   useSensor,
   useSensors,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -20,6 +18,7 @@ import type { LucideIcon } from 'lucide-react';
 import { EditingSafePointerSensor } from '@/components/task/EditingSafePointerSensor';
 import { SortableTaskItem } from '@/components/task/SortableTaskItem';
 import { TaskItem } from '@/components/task/TaskItem';
+import { taskCollision, useTaskDrag } from '@/hooks/useTaskDrag';
 import type { QuadrantMoveDescriptor } from '@/services/taskService';
 import type { QuadrantLayoutMode } from '@/types/settings';
 import type { Quadrant, Task } from '@/types/task';
@@ -68,6 +67,8 @@ interface QuadrantColumnProps {
   activeId: string | null;
   /** 拖拽悬停在本列（高亮描边，明确"拖到哪个象限"） */
   highlight: boolean;
+  after: boolean;
+  insertion?: { index: number; height: number };
   onAdd: (title: string, quadrant: Quadrant) => void;
   onComplete: (id: string) => void;
   onDelete: (id: string) => void;
@@ -81,6 +82,8 @@ function QuadrantColumn({
   overId,
   activeId,
   highlight,
+  after,
+  insertion,
   onAdd,
   onComplete,
   onDelete,
@@ -91,7 +94,7 @@ function QuadrantColumn({
   const { setNodeRef } = useDroppable({ id, data: { quadrant: id } });
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter' || !draft.trim()) return;
+    if (e.nativeEvent.isComposing || e.key !== 'Enter' || !draft.trim()) return;
     onAdd(draft, id);
     setDraft('');
   };
@@ -121,10 +124,13 @@ function QuadrantColumn({
           {tasks.map((task, i) => (
             <SortableTaskItem
               key={task.id}
+              shift={insertion && i >= insertion.index ? insertion.height : 0}
               task={task}
               indicator={
                 overId === task.id && activeId !== task.id
-                  ? 'above'
+                  ? after
+                    ? 'below'
+                    : 'above'
                   : overId === id && activeId !== task.id && i === tasks.length - 1
                     ? 'below'
                     : undefined
@@ -167,9 +173,6 @@ export function QuadrantMatrix({
   onRename,
   onMove,
 }: QuadrantMatrixProps) {
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
-  const [overQuadrant, setOverQuadrant] = useState<Quadrant | null>(null);
   /** 列宽拖拽中的实时比例（抬手才落盘） */
   const [liveWidths, setLiveWidths] = useState<number[] | null>(null);
   const liveWidthsRef = useRef<number[] | null>(null);
@@ -221,47 +224,27 @@ export function QuadrantMatrix({
     document.addEventListener('pointercancel', up);
   };
 
-  const findTask = (quadrant: Quadrant | undefined, id: string | number): Task | null =>
-    quadrant ? (tasksByQuadrant[quadrant].find((t) => t.id === id) ?? null) : null;
-
-  const handleDragStart = ({ active }: DragStartEvent) => {
-    setActiveTask(findTask(active.data.current?.quadrant as Quadrant | undefined, active.id));
-  };
-  const handleDragOver = ({ over }: DragOverEvent) => {
-    setOverId(over ? String(over.id) : null);
-    setOverQuadrant(over ? ((over.data.current?.quadrant ?? over.id) as Quadrant) : null);
-  };
-  const handleDragCancel = () => {
-    setActiveTask(null);
-    setOverId(null);
-    setOverQuadrant(null);
-  };
-  const handleDragEnd = ({ active, over }: DragEndEvent) => {
-    setActiveTask(null);
-    setOverId(null);
-    setOverQuadrant(null);
-    if (!over || active.id === over.id) return;
-
-    const from = active.data.current?.quadrant as Quadrant | undefined;
-    if (!from) return;
-    const to = (over.data.current?.quadrant ?? over.id) as Quadrant;
-    // 目标列表先剔除拖拽项，插入位 = 悬停条目在剔除后列表中的下标（与 planQuadrantMove 语义一致）
-    const targetRest = tasksByQuadrant[to].filter((t) => t.id !== active.id);
-    const overIndex = targetRest.findIndex((t) => t.id === over.id);
-    onMove({
-      id: String(active.id),
-      from,
-      to,
-      toIndex: overIndex === -1 ? targetRest.length : overIndex,
-    });
-  };
+  const {
+    activeTask,
+    overId,
+    overQuadrant,
+    after,
+    target,
+    dragHeight,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+    handleDragCancel,
+  } = useTaskDrag(tasksByQuadrant, onMove);
 
   return (
     <section>
       <DndContext
         sensors={sensors}
+        collisionDetection={taskCollision}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
+        onDragMove={handleDragOver}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
@@ -291,6 +274,12 @@ export function QuadrantMatrix({
                 overId={overId}
                 activeId={activeTask?.id ?? null}
                 highlight={overQuadrant === meta.id}
+                after={after}
+                insertion={
+                  target?.to === meta.id && target.from !== target.to
+                    ? { index: target.toIndex, height: dragHeight }
+                    : undefined
+                }
                 onAdd={onAdd}
                 onComplete={onComplete}
                 onDelete={onDelete}
@@ -325,17 +314,20 @@ export function QuadrantMatrix({
         </div>
 
         {/* 拖拽浮层：抬升 + 投影（reduced-motion 直出，见 TaskItem） */}
-        <DragOverlay>
-          {activeTask ? (
-            <TaskItem
-              task={activeTask}
-              overlay
-              onComplete={() => {}}
-              onDelete={() => {}}
-              onRename={() => {}}
-            />
-          ) : null}
-        </DragOverlay>
+        {createPortal(
+          <DragOverlay dropAnimation={null}>
+            {activeTask ? (
+              <TaskItem
+                task={activeTask}
+                overlay
+                onComplete={() => {}}
+                onDelete={() => {}}
+                onRename={() => {}}
+              />
+            ) : null}
+          </DragOverlay>,
+          document.body,
+        )}
       </DndContext>
     </section>
   );

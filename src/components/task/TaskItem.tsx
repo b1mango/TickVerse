@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { Task } from '@/types/task';
 import { tokenDuration } from '@/utils/motion';
 
@@ -36,7 +35,6 @@ export function TaskItem({ task, overlay, onComplete, onDelete, onRename }: Task
   const [editCaret, setEditCaret] = useState<number | null>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const reducedMotion = useReducedMotion();
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
@@ -100,9 +98,7 @@ export function TaskItem({ task, overlay, onComplete, onDelete, onRename }: Task
     <div
       className={`group flex ${editing ? 'items-start' : 'items-center'} gap-3 rounded-ctl px-1 py-2 transition-colors hover:bg-ink/[0.04] ${
         overlay
-          ? `bg-surface [box-shadow:var(--shadow-float)] ${
-              reducedMotion ? '' : 'scale-[1.02] -translate-y-0.5'
-            }`
+          ? 'bg-surface [box-shadow:var(--shadow-float)]'
           : ''
       }`}
       style={{

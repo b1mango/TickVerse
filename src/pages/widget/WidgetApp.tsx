@@ -2,19 +2,17 @@ import { useEffect, useRef } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { AppWindow, Pin, PinOff } from 'lucide-react';
 import {
-  beginWidgetResize,
-  endWidgetResize,
-  setWidgetFrame,
+  setWidgetOpacity,
   setWidgetSize,
   showMainWindow,
   snapWidgetNow,
-  setWidgetOpacity,
 } from '@/adapters/desktopWidget';
 import type { WidgetResizeDirection } from '@/adapters/desktopWidget';
 import { QuadrantBoardMini } from '@/components/task/QuadrantBoardMini';
 import { Toast } from '@/components/ui/Toast';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { THEME_STORAGE_KEY, WIDGET_FONT_BASE_PX, WIDGET_STORAGE_KEY } from '@/types/settings';
+import { THEME_STORAGE_KEY, WIDGET_STORAGE_KEY } from '@/types/settings';
+import { startResize } from './resizeGesture';
 
 /**
  * 边框全域调尺寸（2026-10-07 修订十六）：四边四角 8 条透明热区。
@@ -33,111 +31,11 @@ const RESIZE_HANDLES: readonly { dir: WidgetResizeDirection; className: string }
   { dir: 'SouthWest', className: 'left-0 bottom-0 h-5 w-5 cursor-sw-resize' },
 ];
 
-function startResize(dir: WidgetResizeDirection, onResizeState: (active: boolean) => void) {
-  return (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const startClient = { x: e.screenX, y: e.screenY };
-    type NativeFrame = Awaited<ReturnType<typeof beginWidgetResize>>;
-    let startFrame: NativeFrame | null = null;
-    let latestPoint = { x: e.screenX, y: e.screenY };
-    let latestFrame: NativeFrame | null = null;
-    let writing = false;
-    let ended = false;
-
-    onResizeState(true);
-
-    const cleanup = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', finish);
-      window.removeEventListener('pointercancel', finish);
-      onResizeState(false);
-    };
-
-    const finishWhenIdle = async () => {
-      if (writing || latestFrame) return;
-      await endWidgetResize();
-      cleanup();
-    };
-
-    const flush = async () => {
-      if (writing || !latestFrame) return;
-      writing = true;
-      const frame = latestFrame;
-      latestFrame = null;
-      await setWidgetFrame(frame, dir).catch(() => undefined);
-      writing = false;
-      if (latestFrame) {
-        void flush();
-      } else if (ended) {
-        void finishWhenIdle();
-      }
-    };
-
-    const updateFrame = (point: { x: number; y: number }) => {
-      if (!startFrame) return;
-      const dx = point.x - startClient.x;
-      const dy = point.y - startClient.y;
-      let { width, height, x, y } = startFrame;
-      if (dir.includes('East')) width = startFrame.width + dx;
-      if (dir.includes('West')) {
-        width = startFrame.width - dx;
-        x = startFrame.x + dx;
-      }
-      // AppKit 原点在左下角：South 边向下移动时，原点 y 反向移动；North 只改变高度。
-      if (dir.includes('South')) {
-        height = startFrame.height + dy;
-        y = startFrame.y - dy;
-      }
-      if (dir.includes('North')) height = startFrame.height - dy;
-      latestFrame = {
-        x: Math.round(x),
-        y: Math.round(y),
-        width: Math.round(width),
-        height: Math.round(height),
-      };
-      void flush();
-    };
-
-    const move = (ev: PointerEvent) => {
-      if (ended) return;
-      latestPoint = { x: ev.screenX, y: ev.screenY };
-      updateFrame(latestPoint);
-    };
-
-    const finish = () => {
-      if (ended) return;
-      ended = true;
-      void flush();
-      void finishWhenIdle();
-    };
-
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', finish, { once: false });
-    window.addEventListener('pointercancel', finish, { once: false });
-
-    void beginWidgetResize()
-      .then((frame) => {
-        startFrame = frame;
-        if (ended) {
-          void finishWhenIdle();
-        } else {
-          updateFrame(latestPoint);
-        }
-      })
-      .catch(() => {
-        ended = true;
-        cleanup();
-      });
-  };
-}
-
 /**
  * 桌面组件壳（M7）：透明无边框窗口 + 顶部拖动条 + 紧凑 2x2 四象限。
  * 与主窗口同源（共享 IndexedDB 与 localStorage）：任务改动经 Dexie liveQuery
  * 跨上下文自动同步；主题/组件偏好改动经 storage 事件即时跟随。
- * 整体缩放用 CSS zoom 实现字号档位（WebKit 支持，布局不受影响）；
+ * 字号通过字体变量调整，保持拖拽坐标与视口像素一致；
  * 四边四角全域拉拽调尺寸，拖停后落盘（逻辑像素），下次启动恢复。
  */
 export function WidgetApp() {
@@ -145,6 +43,11 @@ export function WidgetApp() {
   const locked = useSettingsStore((s) => s.widget.locked);
   const opacity = useSettingsStore((s) => s.widget.opacity);
   const resizingRef = useRef(false);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--text-body', `${font}px/${(font * 26) / 15}px`);
+    document.documentElement.style.setProperty('--text-caption', `${font * 0.8}px/${font * 1.2}px`);
+  }, [font]);
 
   useEffect(() => {
     // 透明窗口的 body 底色透化（index.css 按此属性覆盖）
@@ -162,19 +65,6 @@ export function WidgetApp() {
     // 防止拖拽态/窗口状态变化把用户设置误认为组件自身透明。
     void setWidgetOpacity(opacity);
   }, [opacity]);
-
-  // 松手快路：native 拖窗收不到 pointerup 时由 Rust 600ms 静默兜底，这里双保险（幂等）
-  useEffect(() => {
-    const up = () => {
-      if (!resizingRef.current && !useSettingsStore.getState().widget.locked) void snapWidgetNow();
-    };
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', up);
-    return () => {
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('pointercancel', up);
-    };
-  }, []);
 
   // 尺寸落盘：拖拽连续触发 onResized，防抖 400ms 取终值换算逻辑像素
   useEffect(() => {
@@ -198,16 +88,17 @@ export function WidgetApp() {
   }, []);
 
   return (
-    <div
-      className="relative flex flex-col overflow-hidden p-2"
-      style={{ zoom: font / WIDGET_FONT_BASE_PX, height: `calc(100dvh / ${font / WIDGET_FONT_BASE_PX})` }}
-    >
+    <div className="relative flex flex-col overflow-hidden p-2" style={{ height: '100dvh' }}>
       {/* 拖动条（data-tauri-drag-region）：仅此条可拖窗；双击复位默认尺寸（2026-10-07 修订十三） */}
       <header className="flex h-7 shrink-0 select-none items-center">
         <span
           data-tauri-drag-region={locked ? undefined : true}
-          onDoubleClick={() => { if (!locked) void setWidgetSize(600, 460); }}
-          onPointerUp={() => { if (!locked) void snapWidgetNow(); }}
+          onDoubleClick={() => {
+            if (!locked) void setWidgetSize(600, 460);
+          }}
+          onPointerUp={() => {
+            if (!locked) void snapWidgetNow();
+          }}
           title={locked ? '已固定 · 点击图钉解锁' : '拖动移动位置 · 双击复位尺寸'}
           className="flex flex-1 items-center self-stretch px-1 font-mono text-caption text-sub"
         >
@@ -236,15 +127,16 @@ export function WidgetApp() {
       <Toast />
 
       {/* 边框全域调尺寸热区（z 置顶，置于根 p-2 留白带，不遮卡片交互） */}
-      {!locked && RESIZE_HANDLES.map(({ dir, className }) => (
-        <div
-          key={dir}
-          onPointerDown={startResize(dir, (active) => {
-            resizingRef.current = active;
-          })}
-          className={`absolute z-50 touch-none ${className}`}
-        />
-      ))}
+      {!locked &&
+        RESIZE_HANDLES.map(({ dir, className }) => (
+          <div
+            key={dir}
+            onPointerDown={startResize(dir, (active) => {
+              resizingRef.current = active;
+            })}
+            className={`absolute z-50 touch-none ${className}`}
+          />
+        ))}
     </div>
   );
 }

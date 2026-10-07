@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { QuadrantMatrix } from '@/components/task/QuadrantMatrix';
 import { useQuadrantTasks } from '@/hooks/useTasks';
@@ -5,7 +6,7 @@ import { taskService, type QuadrantMoveDescriptor } from '@/services/taskService
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useUiStore } from '@/stores/uiStore';
 import type { QuadrantLayoutMode } from '@/types/settings';
-import { DEFAULT_QUADRANT_COLUMN_WIDTHS, WIDGET_FONT_BASE_PX } from '@/types/settings';
+import { DEFAULT_QUADRANT_COLUMN_WIDTHS } from '@/types/settings';
 import type { Quadrant, Task } from '@/types/task';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'] as const;
@@ -43,7 +44,7 @@ export function EditorPage() {
   const now = new Date();
 
   const handleAdd = (title: string, quadrant: Quadrant) => {
-    void taskService.addQuadrantTask(title, quadrant, tasksByQuadrant[quadrant]);
+    void taskService.addQuadrantTask(title, quadrant);
   };
   const handleComplete = (id: string) => {
     void taskService.completeTask(id).then(() => {
@@ -74,7 +75,7 @@ export function EditorPage() {
   return (
     <div
       className="mx-auto max-w-[1500px] px-6 pb-32 pt-8"
-      style={{ zoom: editorFont / WIDGET_FONT_BASE_PX }}
+      style={{ '--text-body': `${editorFont}px/${(editorFont * 26) / 15}px` } as CSSProperties}
     >
       {/* 头版区：日期主标 + 星期行；模式操作与星期行同高右置（2026-10-07 修订十二：星期行与卡片间距回松） */}
       <header className="mb-5 flex items-end justify-between">
