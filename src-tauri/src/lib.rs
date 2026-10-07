@@ -100,6 +100,102 @@ const WIDGET_MIN_WIDTH: f64 = 460.0;
 const WIDGET_MIN_HEIGHT: f64 = 340.0;
 const MAIN_THREAD_TIMEOUT_MS: u64 = 500;
 
+#[derive(Clone, Copy)]
+enum WidgetResizeDirection {
+  East,
+  West,
+  North,
+  South,
+  NorthEast,
+  NorthWest,
+  SouthEast,
+  SouthWest,
+}
+
+impl WidgetResizeDirection {
+  fn parse(value: &str) -> Option<Self> {
+    Some(match value {
+      "East" => Self::East,
+      "West" => Self::West,
+      "North" => Self::North,
+      "South" => Self::South,
+      "NorthEast" => Self::NorthEast,
+      "NorthWest" => Self::NorthWest,
+      "SouthEast" => Self::SouthEast,
+      "SouthWest" => Self::SouthWest,
+      _ => return None,
+    })
+  }
+
+  fn east(self) -> bool {
+    matches!(self, Self::East | Self::NorthEast | Self::SouthEast)
+  }
+
+  fn west(self) -> bool {
+    matches!(self, Self::West | Self::NorthWest | Self::SouthWest)
+  }
+
+  fn north(self) -> bool {
+    matches!(self, Self::North | Self::NorthEast | Self::NorthWest)
+  }
+
+  fn south(self) -> bool {
+    matches!(self, Self::South | Self::SouthEast | Self::SouthWest)
+  }
+}
+
+#[derive(Clone, Copy)]
+struct WidgetFrameBounds {
+  left: f64,
+  bottom: f64,
+  right: f64,
+  top: f64,
+}
+
+/// 按 resize 方向固定对边，再限制移动边。
+/// AppKit 坐标原点在左下角：South 固定上边、North 固定下边，避免到 Dock 后上边反向增长。
+fn constrain_widget_frame(
+  direction: Option<WidgetResizeDirection>,
+  x: f64,
+  y: f64,
+  width: f64,
+  height: f64,
+  bounds: WidgetFrameBounds,
+) -> (f64, f64, f64, f64) {
+  let max_width = (bounds.right - bounds.left).max(0.0);
+  let max_height = (bounds.top - bounds.bottom).max(0.0);
+  let min_width = WIDGET_MIN_WIDTH.min(max_width);
+  let min_height = WIDGET_MIN_HEIGHT.min(max_height);
+  let mut next_width = width.max(min_width).min(max_width);
+  let mut next_height = height.max(min_height).min(max_height);
+  let mut next_x = x.clamp(bounds.left, bounds.right - next_width);
+  let mut next_y = y.clamp(bounds.bottom, bounds.top - next_height);
+
+  if let Some(direction) = direction {
+    if direction.west() {
+      let right_anchor = (x + width).clamp(bounds.left + next_width, bounds.right);
+      next_width = width.max(min_width).min(right_anchor - bounds.left);
+      next_x = right_anchor - next_width;
+    } else if direction.east() {
+      let left_anchor = x.clamp(bounds.left, bounds.right - min_width);
+      next_width = width.max(min_width).min(bounds.right - left_anchor);
+      next_x = left_anchor;
+    }
+
+    if direction.south() {
+      let top_anchor = (y + height).clamp(bounds.bottom + min_height, bounds.top);
+      next_height = height.max(min_height).min(top_anchor - bounds.bottom);
+      next_y = top_anchor - next_height;
+    } else if direction.north() {
+      let bottom_anchor = y.clamp(bounds.bottom, bounds.top - min_height);
+      next_height = height.max(min_height).min(bounds.top - bottom_anchor);
+      next_y = bottom_anchor;
+    }
+  }
+
+  (next_x, next_y, next_width, next_height)
+}
+
 /// 所有 AppKit frame 操作都在主线程执行，并等待动作真正完成。
 /// Tauri/tao 的 set_size/set_position 本身是异步派发的，不能把两个调用当作一组原子更新。
 fn run_on_main_thread_sync<T, F>(app: &tauri::AppHandle, f: F) -> Result<T, String>
@@ -172,10 +268,12 @@ fn widget_set_frame(
   y: f64,
   width: f64,
   height: f64,
+  direction: String,
 ) -> Result<(), String> {
   if ![x, y, width, height].iter().all(|v| v.is_finite()) || width <= 0.0 || height <= 0.0 {
     return Err("组件 frame 参数无效".to_string());
   }
+  let resize_direction = WidgetResizeDirection::parse(&direction);
 
   #[cfg(target_os = "macos")]
   {
@@ -190,12 +288,19 @@ fn widget_set_frame(
         return Err("组件没有关联屏幕".to_string());
       };
       let visible = screen.visibleFrame();
-      let next_width = width.max(WIDGET_MIN_WIDTH).min(visible.size.width);
-      let next_height = height.max(WIDGET_MIN_HEIGHT).min(visible.size.height);
-      let max_x = visible.origin.x + (visible.size.width - next_width).max(0.0);
-      let max_y = visible.origin.y + (visible.size.height - next_height).max(0.0);
-      let next_x = x.clamp(visible.origin.x, max_x);
-      let next_y = y.clamp(visible.origin.y, max_y);
+      let (next_x, next_y, next_width, next_height) = constrain_widget_frame(
+        resize_direction,
+        x,
+        y,
+        width,
+        height,
+        WidgetFrameBounds {
+          left: visible.origin.x,
+          bottom: visible.origin.y,
+          right: visible.origin.x + visible.size.width,
+          top: visible.origin.y + visible.size.height,
+        },
+      );
       let mut frame = ns.frame();
       frame.origin.x = next_x;
       frame.origin.y = next_y;
@@ -208,6 +313,7 @@ fn widget_set_frame(
 
   #[cfg(not(target_os = "macos"))]
   {
+    let _ = resize_direction;
     let Some(window) = app.get_webview_window("widget") else {
       return Ok(());
     };
@@ -375,6 +481,9 @@ fn setup_widget_snap(app: &tauri::App) -> tauri::Result<()> {
     if !matches!(event, tauri::WindowEvent::Moved(_)) {
       return;
     }
+    #[cfg(target_os = "macos")]
+    // 移动到另一块屏幕或 Dock 改变显隐后，重新读取当前屏幕的 visibleFrame。
+    cache_screen_insets(&w);
     schedule_snap(w.clone(), SNAP_IDLE_MS);
   });
   Ok(())
@@ -407,6 +516,10 @@ struct SnapBounds {
 }
 
 impl SnapBounds {
+  fn is_valid(&self) -> bool {
+    self.right >= self.left && self.bottom >= self.top
+  }
+
   fn contains(&self, x: f64, y: f64) -> bool {
     x >= self.left && y >= self.top && x <= self.right && y <= self.bottom
   }
@@ -421,6 +534,7 @@ struct SnapCandidate {
   x: f64,
   y: f64,
   distance: f64,
+  priority: u8,
 }
 
 /// 平台无关的边距读取（非 macOS 恒 0 → 常量边距生效）
@@ -461,7 +575,7 @@ fn snap_window(w: &tauri::WebviewWindow) {
 
   // 窗口已经大到没有上下移动空间时，先缩到可见区，再由下一次 Moved 事件重算。
   // 绝不把 bottom bound 强行 max 到 top bound，否则组件会永久卡在屏幕上半区。
-  if bounds.right < bounds.left || bounds.bottom < bounds.top {
+  if !bounds.is_valid() {
     let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize {
       width: ww.min((mw - lp - rp - SNAP_MARGIN * 2.0).max(WIDGET_MIN_WIDTH)),
       height: wh.min((mh - tp - bp - SNAP_MARGIN * 2.0).max(WIDGET_MIN_HEIGHT)),
@@ -480,16 +594,17 @@ fn snap_window(w: &tauri::WebviewWindow) {
   let overlaps_obstacle = obstacles.iter().any(|o| current.intersects(o));
   let mut candidates = Vec::new();
 
-  // 候选必须在工作区内、且不能压住任何原生组件。主路径只在真实边缘附近吸附，
-  // 因而任意松手位置不会再被 20px 网格强行改写。
-  let mut add_candidate = |x: f64, y: f64, force: bool| {
+  // 候选先钳回可见区，再检查是否压住任何原生组件。这样原生组件靠近屏幕边缘时，
+  // 另一侧候选不会因坐标越界被整组丢弃，最终也不会回退到重叠位置。
+  let mut add_candidate = |x: f64, y: f64, force: bool, priority: u8| {
+    let (x, y) = bounds.clamp(x, y);
     let candidate = SnapRect { x, y, w: ww, h: wh };
     if !bounds.contains(x, y) || obstacles.iter().any(|o| candidate.intersects(o)) {
       return;
     }
     let distance = (x - px).hypot(y - py);
     if force || distance <= SNAP_THRESHOLD {
-      candidates.push(SnapCandidate { x, y, distance });
+      candidates.push(SnapCandidate { x, y, distance, priority });
     }
   };
 
@@ -498,33 +613,36 @@ fn snap_window(w: &tauri::WebviewWindow) {
   let near_top = py - bounds.top <= SNAP_THRESHOLD;
   let near_bottom = bounds.bottom - py <= SNAP_THRESHOLD;
   if near_left || px < bounds.left {
-    add_candidate(bounds.left, cy, true);
+    add_candidate(bounds.left, cy, true, 2);
   }
   if near_right || px > bounds.right {
-    add_candidate(bounds.right, cy, true);
+    add_candidate(bounds.right, cy, true, 2);
   }
   if near_top || py < bounds.top {
-    add_candidate(cx, bounds.top, true);
+    add_candidate(cx, bounds.top, true, 2);
   }
   if near_bottom || py > bounds.bottom {
-    add_candidate(cx, bounds.bottom, true);
+    add_candidate(cx, bounds.bottom, true, 2);
   }
   if (near_left || px < bounds.left) && (near_top || py < bounds.top) {
-    add_candidate(bounds.left, bounds.top, true);
+    add_candidate(bounds.left, bounds.top, true, 2);
   }
   if (near_left || px < bounds.left) && (near_bottom || py > bounds.bottom) {
-    add_candidate(bounds.left, bounds.bottom, true);
+    add_candidate(bounds.left, bounds.bottom, true, 2);
   }
   if (near_right || px > bounds.right) && (near_top || py < bounds.top) {
-    add_candidate(bounds.right, bounds.top, true);
+    add_candidate(bounds.right, bounds.top, true, 2);
   }
   if (near_right || px > bounds.right) && (near_bottom || py > bounds.bottom) {
-    add_candidate(bounds.right, bounds.bottom, true);
+    add_candidate(bounds.right, bounds.bottom, true, 2);
   }
 
   // 原生组件候选围绕其真实四条边生成：左右相邻保留松手时的 y，上下相邻保留 x，
   // 同时补上顶/底对齐，便于大组件在任意高度弹到最近的空位。
   for obstacle in &obstacles {
+    let horizontal_overlap = px < obstacle.x + obstacle.w && obstacle.x < px + ww;
+    let near_obstacle_bottom = (py - (obstacle.y + obstacle.h)).abs() <= SNAP_THRESHOLD;
+    let near_obstacle_top = (py + wh - obstacle.y).abs() <= SNAP_THRESHOLD;
     let horizontal_y = [
       cy,
       obstacle.y,
@@ -541,6 +659,7 @@ fn snap_window(w: &tauri::WebviewWindow) {
     let top_y = obstacle.y - wh - SNAP_GAP;
     let horizontal_near = (px - right_x).abs() <= SNAP_THRESHOLD
       || (px - left_x).abs() <= SNAP_THRESHOLD
+      || (horizontal_overlap && (near_obstacle_bottom || near_obstacle_top))
       || overlaps_obstacle;
     let vertical_near = (py - bottom_y).abs() <= SNAP_THRESHOLD
       || (py - top_y).abs() <= SNAP_THRESHOLD
@@ -548,21 +667,25 @@ fn snap_window(w: &tauri::WebviewWindow) {
 
     if horizontal_near {
       for y in horizontal_y {
-        add_candidate(right_x, y, overlaps_obstacle);
-        add_candidate(left_x, y, overlaps_obstacle);
+        add_candidate(right_x, y, true, 0);
+        add_candidate(left_x, y, true, 0);
       }
     }
     if vertical_near {
       for x in vertical_x {
-        add_candidate(x, bottom_y, overlaps_obstacle);
-        add_candidate(x, top_y, overlaps_obstacle);
+        add_candidate(x, bottom_y, true, 1);
+        add_candidate(x, top_y, true, 1);
       }
     }
   }
 
   let target = candidates
     .into_iter()
-    .min_by(|a, b| a.distance.total_cmp(&b.distance))
+    .min_by(|a, b| {
+      a.priority
+        .cmp(&b.priority)
+        .then_with(|| a.distance.total_cmp(&b.distance))
+    })
     .map(|candidate| (candidate.x, candidate.y))
     .unwrap_or((cx, cy));
 
@@ -572,7 +695,7 @@ fn snap_window(w: &tauri::WebviewWindow) {
     w: ww,
     h: wh,
   };
-  let (tx, ty) = if overlaps_obstacle && obstacles.iter().any(|o| target_rect.intersects(o)) {
+  let (tx, ty) = if obstacles.iter().any(|o| target_rect.intersects(o)) {
     // 组件过大、所有真实边缘都放不下时才进入兜底；主路径没有网格跳跃。
     least_overlap_position(cx, cy, ww, wh, bounds, &obstacles)
   } else {
@@ -601,23 +724,50 @@ fn least_overlap_position(
     (overlap, (x - x0).hypot(y - y0))
   };
   let initial = bounds.clamp(x0, y0);
-  let mut best = (score(initial.0, initial.1), initial);
+  let mut points = vec![initial, (bounds.left, bounds.top), (bounds.left, bounds.bottom), (bounds.right, bounds.top), (bounds.right, bounds.bottom)];
 
-  for ring in 0..=12i32 {
-    let step = 20.0;
-    for dx in -ring..=ring {
-      for dy in -ring..=ring {
-        if ring > 0 && dx.abs().max(dy.abs()) != ring {
-          continue;
-        }
-        let (x, y) = bounds.clamp(x0 + f64::from(dx) * step, y0 + f64::from(dy) * step);
-        let candidate = (score(x, y), (x, y));
-        if candidate.0.0 < best.0.0
-          || (candidate.0.0 == best.0.0 && candidate.0.1 < best.0.1)
-        {
-          best = candidate;
-        }
+  // 把每个原生组件的四条外侧边投影到可见区；普通尺寸组件通常在这里就能找到
+  // 完全不重叠的位置，避免旧版只搜索当前点周围 240px 而仍压住左侧组件。
+  for obstacle in obstacles {
+    let xs = [
+      obstacle.x - ww - SNAP_GAP,
+      obstacle.x + obstacle.w + SNAP_GAP,
+      obstacle.x,
+      obstacle.x + obstacle.w - ww,
+    ];
+    let ys = [
+      obstacle.y - wh - SNAP_GAP,
+      obstacle.y + obstacle.h + SNAP_GAP,
+      obstacle.y,
+      obstacle.y + obstacle.h - wh,
+    ];
+    for x in xs {
+      for y in ys {
+        points.push(bounds.clamp(x, y));
       }
+    }
+  }
+
+  // 临界边投影仍可能被多个组件共同挡住时，用稀疏全域搜索保证只要存在空位就能找到。
+  let step = 24.0;
+  let x_count = ((bounds.right - bounds.left) / step).ceil() as i32;
+  let y_count = ((bounds.bottom - bounds.top) / step).ceil() as i32;
+  for ix in 0..=x_count {
+    for iy in 0..=y_count {
+      points.push((
+        (bounds.left + f64::from(ix) * step).min(bounds.right),
+        (bounds.top + f64::from(iy) * step).min(bounds.bottom),
+      ));
+    }
+  }
+
+  let mut best = (score(initial.0, initial.1), initial);
+  for point in points {
+    let candidate = (score(point.0, point.1), point);
+    if candidate.0.0 < best.0.0
+      || (candidate.0.0 == best.0.0 && candidate.0.1 < best.0.1)
+    {
+      best = candidate;
     }
   }
   best.1
@@ -766,3 +916,59 @@ fn maybe_clear_webview_cache() {
 
 #[cfg(not(target_os = "windows"))]
 fn maybe_clear_webview_cache() {}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn bounds() -> WidgetFrameBounds {
+    WidgetFrameBounds {
+      left: 0.0,
+      bottom: 80.0,
+      right: 1440.0,
+      top: 1000.0,
+    }
+  }
+
+  #[test]
+  fn south_resize_keeps_top_edge_when_bottom_reaches_dock() {
+    let frame = constrain_widget_frame(
+      Some(WidgetResizeDirection::South),
+      200.0,
+      -200.0,
+      600.0,
+      1060.0,
+      bounds(),
+    );
+
+    assert_eq!(frame, (200.0, 80.0, 600.0, 780.0));
+  }
+
+  #[test]
+  fn north_resize_keeps_bottom_edge_when_top_reaches_menu_bar() {
+    let frame = constrain_widget_frame(
+      Some(WidgetResizeDirection::North),
+      200.0,
+      400.0,
+      600.0,
+      800.0,
+      bounds(),
+    );
+
+    assert_eq!(frame, (200.0, 400.0, 600.0, 600.0));
+  }
+
+  #[test]
+  fn west_resize_keeps_right_edge_at_minimum_width() {
+    let frame = constrain_widget_frame(
+      Some(WidgetResizeDirection::West),
+      1000.0,
+      300.0,
+      100.0,
+      400.0,
+      bounds(),
+    );
+
+    assert_eq!(frame, (640.0, 300.0, 460.0, 400.0));
+  }
+}

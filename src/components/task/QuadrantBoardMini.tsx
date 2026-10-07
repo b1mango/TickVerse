@@ -107,6 +107,7 @@ function WidgetColumn({
               onComplete={onComplete}
               onDelete={onDelete}
               onRename={onRename}
+              dimWhenDragging={false}
             />
           ))}
           {overId === id && tasks.length === 0 && <div className="mx-1 mt-1.5 h-0.5 bg-accent" />}

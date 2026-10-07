@@ -11,6 +11,8 @@ interface SortableTaskItemProps {
   onComplete: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
+  /** 记录页保留拖拽反馈；桌面组件不降低条目透明度，避免组件整体像消失。 */
+  dimWhenDragging?: boolean;
 }
 
 /** 让位过渡时长（方向稿 token --dur-fast），reduced-motion 时归零 */
@@ -23,6 +25,7 @@ export function SortableTaskItem({
   onComplete,
   onDelete,
   onRename,
+  dimWhenDragging = true,
 }: SortableTaskItemProps) {
   const reducedMotion = useReducedMotion();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -50,7 +53,7 @@ export function SortableTaskItem({
       }}
       {...attributes}
       {...listeners}
-      className={isDragging ? 'opacity-30' : ''}
+      className={isDragging && dimWhenDragging ? 'opacity-30' : ''}
     >
       <TaskItem task={task} onComplete={onComplete} onDelete={onDelete} onRename={onRename} />
     </div>

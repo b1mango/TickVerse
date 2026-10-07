@@ -23,6 +23,16 @@ export interface WidgetNativeFrame {
   height: number;
 }
 
+export type WidgetResizeDirection =
+  | 'East'
+  | 'North'
+  | 'NorthEast'
+  | 'NorthWest'
+  | 'South'
+  | 'SouthEast'
+  | 'SouthWest'
+  | 'West';
+
 /** 开始一次八向 resize：返回 AppKit 真实 frame，并暂停位置吸附计时器 */
 export async function beginWidgetResize(): Promise<WidgetNativeFrame> {
   if (!isTauri) return { x: 0, y: 0, width: 600, height: 460 };
@@ -30,9 +40,12 @@ export async function beginWidgetResize(): Promise<WidgetNativeFrame> {
 }
 
 /** 原子提交完整 frame；macOS 侧在主线程一次 setFrame 同时更新原点与尺寸 */
-export async function setWidgetFrame(frame: WidgetNativeFrame): Promise<void> {
+export async function setWidgetFrame(
+  frame: WidgetNativeFrame,
+  direction: WidgetResizeDirection,
+): Promise<void> {
   if (!isTauri) return;
-  await invoke('widget_set_frame', { ...frame });
+  await invoke('widget_set_frame', { ...frame, direction });
 }
 
 /** 结束 resize，之后才允许 Moved/pointerup 吸附 */

@@ -8,29 +8,20 @@ import {
   setWidgetSize,
   showMainWindow,
   snapWidgetNow,
+  setWidgetOpacity,
 } from '@/adapters/desktopWidget';
+import type { WidgetResizeDirection } from '@/adapters/desktopWidget';
 import { QuadrantBoardMini } from '@/components/task/QuadrantBoardMini';
 import { Toast } from '@/components/ui/Toast';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { THEME_STORAGE_KEY, WIDGET_FONT_BASE_PX, WIDGET_STORAGE_KEY } from '@/types/settings';
-
-/** @tauri-apps/api 未导出 ResizeDirection 联合类型（window.d.ts 内部声明），本地复刻字面量 */
-type ResizeDirection =
-  | 'East'
-  | 'North'
-  | 'NorthEast'
-  | 'NorthWest'
-  | 'South'
-  | 'SouthEast'
-  | 'SouthWest'
-  | 'West';
 
 /**
  * 边框全域调尺寸（2026-10-07 修订十六）：四边四角 8 条透明热区。
  * macOS 侧用 AppKit 原生 frame 一次性更新原点与尺寸，避免 tao 的 set_size/set_position
  * 异步竞态；指针增量乘 zoom 还原为逻辑像素，尺寸落盘走既有 onResized 防抖。
  */
-const RESIZE_HANDLES: readonly { dir: ResizeDirection; className: string }[] = [
+const RESIZE_HANDLES: readonly { dir: WidgetResizeDirection; className: string }[] = [
   // 边热区 12px、角热区 20px（8px 实测命中率低，"下方有时候拉不动"）
   { dir: 'North', className: 'top-0 inset-x-5 h-3 cursor-n-resize' },
   { dir: 'South', className: 'bottom-0 inset-x-5 h-3 cursor-s-resize' },
@@ -46,7 +37,7 @@ const RESIZE_HANDLES: readonly { dir: ResizeDirection; className: string }[] = [
 const MIN_W = 460;
 const MIN_H = 340;
 
-function startResize(dir: ResizeDirection, onResizeState: (active: boolean) => void) {
+function startResize(dir: WidgetResizeDirection, onResizeState: (active: boolean) => void) {
   return (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -80,7 +71,7 @@ function startResize(dir: ResizeDirection, onResizeState: (active: boolean) => v
       writing = true;
       const frame = latestFrame;
       latestFrame = null;
-      await setWidgetFrame(frame).catch(() => undefined);
+      await setWidgetFrame(frame, dir).catch(() => undefined);
       writing = false;
       if (latestFrame) {
         void flush();
@@ -156,6 +147,7 @@ function startResize(dir: ResizeDirection, onResizeState: (active: boolean) => v
  */
 export function WidgetApp() {
   const font = useSettingsStore((s) => s.widget.font);
+  const opacity = useSettingsStore((s) => s.widget.opacity);
   const resizingRef = useRef(false);
 
   useEffect(() => {
@@ -168,6 +160,12 @@ export function WidgetApp() {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+
+  useEffect(() => {
+    // 组件窗口与主窗口分别由 AppKit 持有 alpha；偏好同步或窗口重建后显式恢复，
+    // 防止拖拽态/窗口状态变化把用户设置误认为组件自身透明。
+    void setWidgetOpacity(opacity);
+  }, [opacity]);
 
   // 松手快路：native 拖窗收不到 pointerup 时由 Rust 600ms 静默兜底，这里双保险（幂等）
   useEffect(() => {
