@@ -1,13 +1,14 @@
 import { useEffect } from 'react';
 import { BarChart3, PenLine, Ruler, Settings } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { isTauri, setWidgetOpacity, setWidgetSize, setWidgetVisible } from '@/adapters/desktopWidget';
 import { Toast } from '@/components/ui/Toast';
-import { seedOnLaunch } from '@/services/seedService';
 import { initSync } from '@/services/syncService';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useUiStore } from '@/stores/uiStore';
 
 const NAV = [
-  { to: '/', label: '代办', icon: PenLine },
+  { to: '/', label: '待办', icon: PenLine },
   { to: '/timeline', label: '时间轴', icon: Ruler },
   { to: '/stats', label: '统计', icon: BarChart3 },
   { to: '/settings', label: '设置', icon: Settings },
@@ -16,12 +17,6 @@ const NAV = [
 /** 应用壳：启动种子检测 + 四页路由出口 + 底部导航（Lucide 图标 + mono 小字，当前项朱砂） */
 function App() {
   useEffect(() => {
-    // 初始种子待办（四象限）：本机首次启动且库为空时写入
-    void seedOnLaunch().then((n) => {
-      if (n > 0) {
-        useUiStore.getState().showToast({ message: `已写入 ${n} 条初始待办 → 四象限` });
-      }
-    });
     // WebDAV 快照同步（清单 M5-4）：启用时打开拉取一次，本地变更防抖推送
     initSync();
     // 浏览器数据防清理（清单 M5-3）：申请持久存储，被拒则提示定期导出备份
@@ -36,6 +31,25 @@ function App() {
         }
       })
       .catch(() => {});
+  }, []);
+
+  // 桌面组件（M7）：恢复上次的显隐 / 拖拽尺寸 / 透明度。
+  // 尺寸恢复带自愈钳位（2026-10-07 修订十三）：异常时代（拖拽失效期）曾被放大到近全屏，
+  // 超高/超宽会把"垂直移动自由度"与"避让空间"都锁死——越界一律回默认 640×480
+  useEffect(() => {
+    if (!isTauri) return;
+    const { widget, setWidget } = useSettingsStore.getState();
+    void setWidgetVisible(widget.visible);
+    let { width, height } = widget;
+    const tooWide = (width ?? 0) > 900;
+    const tooTall = (height ?? 0) > Math.round(window.screen.height * 0.72);
+    if (tooWide || tooTall) {
+      width = 640;
+      height = 480;
+      setWidget({ width, height });
+    }
+    if (width && height) void setWidgetSize(width, height);
+    void setWidgetOpacity(widget.opacity);
   }, []);
 
   return (

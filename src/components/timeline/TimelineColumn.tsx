@@ -1,7 +1,17 @@
 import dayjs from 'dayjs';
+import { Undo2 } from 'lucide-react';
+import { taskService } from '@/services/taskService';
 import type { ZoomColumn, ZoomLevel } from '@/services/timelineService';
 import { isOverdue } from '@/services/timelineService';
+import { useUiStore } from '@/stores/uiStore';
 import type { Task } from '@/types/task';
+
+/** 取消归档：抹掉 completedAt 回到待办，toast 反馈（2026-10-06 修订九） */
+function handleUnarchive(id: string) {
+  void taskService.unarchiveTask(id).then(() => {
+    useUiStore.getState().showToast({ message: '已取回 → 待办' });
+  });
+}
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'] as const;
 
@@ -79,25 +89,35 @@ function DayTemplate({
           <div className="my-0.5 h-px shrink-0 bg-line/70" />
         )}
 
-        {/* 已完成：朱砂墨笔划线（line-through 随折行逐行划过） */}
+        {/* 已完成：朱砂墨笔划线（line-through 随折行逐行划过）；hover 可撤销归档回待办 */}
         {column.completed.map((t) => (
           <div
             key={t.id}
-            className={`shrink-0 ${compact ? 'px-1 py-0' : 'px-1.5 py-0.5'}`}
+            className={`group flex shrink-0 items-start gap-1 ${compact ? 'px-1 py-0' : 'px-1.5 py-0.5'}`}
             title={t.title}
           >
-            <p
-              className={`line-clamp-2 text-sub line-through decoration-accent/85 decoration-[1.5px] ${
-                compact ? 'text-[10px] leading-[14px]' : 'text-caption leading-4'
-              }`}
-            >
-              {t.title}
-            </p>
-            {level === 'day' && (
-              <p className="font-mono text-[10px] leading-4 text-sub/70">
-                {dayjs(t.completedAt).format('HH:mm')}
+            <div className="min-w-0 flex-1">
+              <p
+                className={`line-clamp-2 text-sub line-through decoration-accent/85 decoration-[1.5px] ${
+                  compact ? 'text-[10px] leading-[14px]' : 'text-caption leading-4'
+                }`}
+              >
+                {t.title}
               </p>
-            )}
+              {level === 'day' && (
+                <p className="font-mono text-[10px] leading-4 text-sub/70">
+                  {dayjs(t.completedAt).format('HH:mm')}
+                </p>
+              )}
+            </div>
+            <button
+              aria-label="取消归档"
+              title="取消归档，回到待办"
+              onClick={() => handleUnarchive(t.id)}
+              className="mt-0.5 shrink-0 text-sub opacity-0 transition-opacity hover:text-accent focus-visible:opacity-100 group-hover:opacity-100"
+            >
+              <Undo2 size={11} />
+            </button>
           </div>
         ))}
       </div>

@@ -1,15 +1,20 @@
 import { useRef, useState } from 'react';
 import { Check } from 'lucide-react';
+import { isTauri, setWidgetOpacity, setWidgetVisible } from '@/adapters/desktopWidget';
 import { listModels, testConnection } from '@/adapters/llm';
 import { testWebdav } from '@/adapters/webdav';
 import { exportBackup, parseBackup, restoreBackup } from '@/services/backupService';
-import { clearSeedTasks, seedIfEmpty } from '@/services/seedService';
 import { initSync, pullNow, pushNow } from '@/services/syncService';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useUiStore } from '@/stores/uiStore';
-import type { ThemeMode, ThemeStyle } from '@/types/settings';
-import { WEBDAV_PRESETS } from '@/types/settings';
+import type { ThemeFont, ThemeMode, ThemeStyle } from '@/types/settings';
+import {
+  EDITOR_FONT_RANGE,
+  WEBDAV_PRESETS,
+  WIDGET_FONT_RANGE,
+  WIDGET_OPACITY_RANGE,
+} from '@/types/settings';
 
 const STYLES: { value: ThemeStyle; label: string }[] = [
   { value: 'archive', label: '档案室' },
@@ -22,6 +27,12 @@ const MODES: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: '跟随系统' },
 ];
 
+const FONTS: { value: ThemeFont; label: string }[] = [
+  { value: 'auto', label: '跟随风格' },
+  { value: 'serif', label: '衬线' },
+  { value: 'sans', label: '黑体' },
+];
+
 /**
  * 设置页（§11 页面 4 / 方向稿 §10：分组列表式 + hairline 分隔）。
  * 主题 / LLM 配置（OpenAI 兼容，Key 只存本地）/ 数据（导出·导入 JSON）/ 初始数据。
@@ -30,10 +41,15 @@ export function SettingsPage() {
   const theme = useSettingsStore((s) => s.theme);
   const llm = useSettingsStore((s) => s.llm);
   const webdav = useSettingsStore((s) => s.webdav);
+  const widget = useSettingsStore((s) => s.widget);
   const setStyle = useSettingsStore((s) => s.setStyle);
   const setMode = useSettingsStore((s) => s.setMode);
+  const setFont = useSettingsStore((s) => s.setFont);
   const setLlm = useSettingsStore((s) => s.setLlm);
   const setWebdav = useSettingsStore((s) => s.setWebdav);
+  const setWidget = useSettingsStore((s) => s.setWidget);
+  const editorFont = useSettingsStore((s) => s.editorFont);
+  const setEditorFont = useSettingsStore((s) => s.setEditorFont);
   const syncing = useSyncStore((s) => s.syncing);
   const lastSyncAt = useSyncStore((s) => s.lastSyncAt);
   const lastSyncError = useSyncStore((s) => s.lastError);
@@ -46,7 +62,6 @@ export function SettingsPage() {
   const [testingDav, setTestingDav] = useState(false);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [busySeed, setBusySeed] = useState(false);
   const [confirmImport, setConfirmImport] = useState<{ text: string; count: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -103,25 +118,6 @@ export function SettingsPage() {
     await pushNow();
     const err = useSyncStore.getState().lastError;
     showToast({ message: err ? `同步失败：${err}` : '同步完成' });
-  };
-
-  const handleSeed = async () => {
-    setBusySeed(true);
-    try {
-      const n = await seedIfEmpty();
-      showToast({ message: n > 0 ? `已填充 ${n} 条初始待办` : '已有记录，未填充' });
-    } finally {
-      setBusySeed(false);
-    }
-  };
-  const handleClearSeed = async () => {
-    setBusySeed(true);
-    try {
-      const n = await clearSeedTasks();
-      showToast({ message: `已清除 ${n} 条初始待办` });
-    } finally {
-      setBusySeed(false);
-    }
   };
 
   const handleExport = () => {
@@ -186,11 +182,124 @@ export function SettingsPage() {
               ))}
             </div>
           </div>
+          <div className="flex h-12 items-center justify-between">
+            <span className="text-body">字体</span>
+            <div className="flex gap-2">
+              {FONTS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setFont(value)}
+                  className={`rounded-ctl border px-3 py-1 font-mono text-caption transition-colors ${
+                    theme.font === value
+                      ? 'border-accent text-accent'
+                      : 'border-line text-sub hover:text-ink'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         <p className="mt-3 font-mono text-caption text-sub">
           宣纸 / 墨室 / 白页 / 黑场 · 偏好仅存本地，不同步
         </p>
       </section>
+
+      {/* 待办页 */}
+      <section className="mt-12">
+        <h2 className="font-mono text-caption text-sub">待办页</h2>
+        <div className="mt-2 divide-y divide-line border-y border-line">
+          <div className="flex h-12 items-center justify-between">
+            <span className="text-body">正文字号</span>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={EDITOR_FONT_RANGE.min}
+                max={EDITOR_FONT_RANGE.max}
+                step={EDITOR_FONT_RANGE.step}
+                value={editorFont}
+                onChange={(e) => setEditorFont(Number(e.target.value))}
+                className="accent-accent"
+              />
+              <span className="w-12 text-right font-mono text-caption text-sub">{editorFont}px</span>
+            </div>
+          </div>
+        </div>
+        <p className="mt-3 font-mono text-caption text-sub">
+          缩放作用于待办页整页排版与交互（15 = 基准字号），卡片高度随窗口大小自适应
+        </p>
+      </section>
+
+      {/* 桌面组件（M7）：Tauri 第二窗口钉在桌面层级；mac 关窗不退出（Cmd+Q 退出），组件随应用常驻 */}
+      {isTauri && (
+        <section className="mt-12">
+          <h2 className="font-mono text-caption text-sub">桌面组件</h2>
+          <div className="mt-2 divide-y divide-line border-y border-line">
+            <div className="flex h-12 items-center justify-between">
+              <span className="text-body">在桌面显示四象限组件</span>
+              <button
+                onClick={() => {
+                  const next = !widget.visible;
+                  setWidget({ visible: next });
+                  void setWidgetVisible(next);
+                }}
+                className={`rounded-full border px-4 py-1 font-mono text-caption transition-colors ${
+                  widget.visible
+                    ? 'border-accent text-accent'
+                    : 'border-line text-sub hover:text-ink'
+                }`}
+              >
+                {widget.visible ? '显示中' : '已隐藏'}
+              </button>
+            </div>
+            <div className="flex h-12 items-center justify-between">
+              <span className="text-body">组件字号</span>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={WIDGET_FONT_RANGE.min}
+                  max={WIDGET_FONT_RANGE.max}
+                  step={WIDGET_FONT_RANGE.step}
+                  value={widget.font}
+                  onChange={(e) => setWidget({ font: Number(e.target.value) })}
+                  className="accent-accent"
+                />
+                <span className="w-12 text-right font-mono text-caption text-sub">
+                  {widget.font}px
+                </span>
+              </div>
+            </div>
+            <div className="flex h-12 items-center justify-between">
+              <span className="text-body">组件透明度</span>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={WIDGET_OPACITY_RANGE.min}
+                  max={WIDGET_OPACITY_RANGE.max}
+                  step={WIDGET_OPACITY_RANGE.step}
+                  value={widget.opacity}
+                  onChange={(e) => {
+                    const opacity = Number(e.target.value);
+                    setWidget({ opacity });
+                    void setWidgetOpacity(opacity);
+                  }}
+                  className="accent-accent"
+                />
+                <span className="w-12 text-right font-mono text-caption text-sub">
+                  {Math.round(widget.opacity * 100)}%
+                </span>
+              </div>
+            </div>
+          </div>
+          <p className="mt-3 font-mono text-caption leading-5 text-sub">
+            组件置底在桌面、其他窗口之下，「显示桌面」手势也不隐去；始终可交互，双击即改。
+            拖动顶部「拾刻」条移动位置（双击可复位尺寸），松手按 20px 网格吸附并避让 macOS
+            原生组件；拖任意边缘直接调整尺寸；右上角按钮唤起主窗口。
+            组件被挡在窗口之下的区域不可点——把挡着的窗口挪开、或关闭主窗（红色钮，不退出）后再操作。
+          </p>
+        </section>
+      )}
 
       {/* LLM 配置（2026-08-28 改版，参考 ccswitch 类主流接入：名称 + Base URL + Key + 获取模型多选） */}
       <section className="mt-12">
@@ -452,36 +561,6 @@ export function SettingsPage() {
             : lastSyncError
               ? `上次同步失败：${lastSyncError}`
               : '快照为单 JSON 文件，按记录更新时间逐条取新合并；删除操作不会同步到远端。凭据只存本机。'}
-        </p>
-      </section>
-
-      {/* 初始数据（四象限种子待办，seedService） */}
-      <section className="mt-12">
-        <h2 className="font-mono text-caption text-sub">初始数据</h2>
-        <div className="mt-2 divide-y divide-line border-y border-line">
-          <div className="flex h-12 items-center justify-between">
-            <span className="text-body">填充初始四象限待办（仅应用内无记录时写入）</span>
-            <button
-              onClick={handleSeed}
-              disabled={busySeed}
-              className="rounded-full border border-line px-4 py-1 font-mono text-caption text-sub transition-colors hover:text-ink disabled:opacity-40"
-            >
-              填充
-            </button>
-          </div>
-          <div className="flex h-12 items-center justify-between">
-            <span className="text-body">清除全部初始待办</span>
-            <button
-              onClick={handleClearSeed}
-              disabled={busySeed}
-              className="rounded-full border border-accent px-4 py-1 font-mono text-caption text-accent transition-opacity hover:opacity-70 disabled:opacity-40"
-            >
-              清除
-            </button>
-          </div>
-        </div>
-        <p className="mt-3 font-mono text-caption text-sub">
-          初始待办带 seed 标签，清除不影响手动录入的记录
         </p>
       </section>
 

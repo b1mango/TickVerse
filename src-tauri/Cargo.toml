@@ -21,6 +21,13 @@ tauri-build = { version = "2.6.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.3", features = [] }
+tauri = { version = "2.11.3", features = ["macos-private-api"] }
 tauri-plugin-log = "2"
 tauri-plugin-http = "2"
+
+# macOS 桌面组件：NSWindow 层级/全空间行为 + CGWindowList 枚举原生组件帧（吸附避让）
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+core-foundation = "0.10"
+core-graphics = "0.25"

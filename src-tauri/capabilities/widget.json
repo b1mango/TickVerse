@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "widget",
+  "description": "桌面组件窗口：核心默认权限 + 拖动条（data-tauri-drag-region）；不联网，不给 http",
+  "windows": [
+    "widget"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-scale-factor"
+  ]
+}

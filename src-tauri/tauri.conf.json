@@ -10,6 +10,7 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "拾刻 TickVerse",
@@ -19,6 +20,23 @@
         "minHeight": 640,
         "resizable": true,
         "fullscreen": false
+      },
+      {
+        "label": "widget",
+        "title": "拾刻",
+        "url": "/?window=widget",
+        "width": 600,
+        "height": 460,
+        "minWidth": 460,
+        "minHeight": 340,
+        "resizable": true,
+        "fullscreen": false,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnBottom": true,
+        "skipTaskbar": true
       }
     ],
     "security": {
@@ -35,6 +53,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico"

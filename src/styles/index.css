@@ -31,6 +31,13 @@
   }
 }
 
+@layer base {
+  /* 桌面组件窗口（M7）：窗口整体透明，底色与毛玻璃交给象限卡片 */
+  html[data-window='widget'] body {
+    background-color: transparent;
+  }
+}
+
 /* 隐藏滑动条但保留滚动（四象限列卡 / 时间轴日期卡的卡内清单用，2026-08-28 用户钦定） */
 .no-scrollbar {
   scrollbar-width: none;

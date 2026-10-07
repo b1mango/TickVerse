@@ -284,7 +284,7 @@ export function TimelinePage() {
       <div className="mx-auto flex min-h-[70vh] max-w-2xl flex-col items-center justify-center gap-4 px-6 pb-32 text-center">
         <Ruler size={48} strokeWidth={1} className="text-sub" />
         <p className="font-display text-display-2">勾掉的事，会在这里沉淀成刻度</p>
-        <p className="font-mono text-caption text-sub">先去代办页拾起一刻</p>
+        <p className="font-mono text-caption text-sub">先去待办页拾起一刻</p>
       </div>
     );
   }

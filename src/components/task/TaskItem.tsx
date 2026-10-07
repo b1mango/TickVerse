@@ -27,6 +27,7 @@ function autosize(ta: HTMLTextAreaElement): void {
  * 完成动效基础版：勾选描边（micro）→ 划线左→右（fast）→ 右移 24px 淡出（normal）
  * → 归档戳淡入（档案室描边戳旋转 −8° / 极简文字直出）→ 写 completedAt。
  * 双击编辑：光标落回双击命中位置；编辑态 textarea 保形多行（Enter 提交 / Shift+Enter 换行 / Esc 取消）。
+ * 展示态 whitespace-pre-wrap 保留手动换行（2026-10-07 修订十四）。
  */
 export function TaskItem({ task, overlay, onComplete, onDelete, onRename }: TaskItemProps) {
   const [phase, setPhase] = useState<Phase>('idle');
@@ -153,7 +154,7 @@ export function TaskItem({ task, overlay, onComplete, onDelete, onRename }: Task
           className="w-full flex-1 resize-none overflow-hidden bg-transparent text-body focus:outline-none"
         />
       ) : (
-        <span className="relative flex-1 text-body" onDoubleClick={handleDoubleClick}>
+        <span className="relative flex-1 whitespace-pre-wrap break-words text-body" onDoubleClick={handleDoubleClick}>
           {task.title}
           <span
             className="absolute left-0 top-1/2 h-px bg-sub"

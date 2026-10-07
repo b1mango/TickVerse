@@ -1,18 +1,21 @@
 /**
- * 主题偏好（《项目设计.md》§9）：风格 × 明暗二维。
+ * 主题偏好（《项目设计.md》§9）：风格 × 明暗 × 字体三维。
  * 偏好仅存 localStorage，不进 WebDAV 同步文件。
  */
 export type ThemeStyle = 'archive' | 'mono';
 export type ThemeMode = 'light' | 'dark' | 'system';
+/** 字体（2026-10-06 修订九新增维度）：auto 跟随风格（现状）/ serif 衬线 / sans 黑体 */
+export type ThemeFont = 'auto' | 'serif' | 'sans';
 
 export interface ThemePreference {
   style: ThemeStyle;
   mode: ThemeMode;
+  font: ThemeFont;
 }
 
 export const THEME_STORAGE_KEY = 'tickverse.theme';
 
-export const DEFAULT_THEME: ThemePreference = { style: 'archive', mode: 'system' };
+export const DEFAULT_THEME: ThemePreference = { style: 'archive', mode: 'system', font: 'auto' };
 
 /**
  * LLM 配置（§10.3）：OpenAI 兼容接入（2026-08-28 改版参考 ccswitch 类主流做法：
@@ -68,6 +71,42 @@ export const DEFAULT_WEBDAV: WebdavConfig = {
   remotePath: 'tickverse/tickverse-sync.json',
   enabled: false,
 };
+
+/**
+ * 桌面组件偏好（M7，Tauri 第二窗口）：显隐 + 字号（zoom 连续值）+ 透明度 + 拖拽落定的尺寸。
+ * 与主题一样只存 localStorage；改动经 storage 事件即时同步组件窗。
+ * 修订九（2026-10-06）：点击穿透已删（始终可交互）；尺寸改组件边缘直拖（去设置预设）。
+ */
+export interface WidgetPrefs {
+  visible: boolean;
+  /** 组件正文字号（px，基准 15；组件侧 zoom = font/15），WIDGET_FONT_RANGE 范围内 */
+  font: number;
+  /** 组件窗口透明度（NSWindow alpha），WIDGET_OPACITY_RANGE 范围内 */
+  opacity: number;
+  /** 用户在组件上拖边缘调出的尺寸（逻辑像素，启动恢复用） */
+  width?: number;
+  height?: number;
+}
+
+export const WIDGET_STORAGE_KEY = 'tickverse.widget';
+
+export const DEFAULT_WIDGET: WidgetPrefs = { visible: true, font: 15, opacity: 1 };
+
+/** 字号滑动条范围（正文字号 px） */
+export const WIDGET_FONT_RANGE = { min: 12, max: 22, step: 0.5 } as const;
+
+/** 组件字号 px → 根 zoom 系数的基准字号（与 token --text-body 一致） */
+export const WIDGET_FONT_BASE_PX = 15;
+
+/** 待办页正文字号（px，页面根 zoom = font / WIDGET_FONT_BASE_PX；仅存 localStorage） */
+export const EDITOR_FONT_STORAGE_KEY = 'tickverse.editorFont';
+
+export const EDITOR_FONT_RANGE = { min: 12, max: 22, step: 0.5 } as const;
+
+export const DEFAULT_EDITOR_FONT = 15;
+
+/** 透明度滑动条范围 */
+export const WIDGET_OPACITY_RANGE = { min: 0.3, max: 1, step: 0.05 } as const;
 
 /**
  * 四象限模块版式偏好：columns 四列（auto-fit 响应式，宽容器一行四列 / 窄容器自动降级）

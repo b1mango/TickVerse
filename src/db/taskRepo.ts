@@ -42,20 +42,19 @@ export const taskRepo = {
     await db.tasks.update(id, { completedAt: now, updatedAt: now });
   },
 
+  /** 取消归档：抹掉 completedAt（2026-10-06 修订九），条目回到待办 */
+  async uncomplete(id: string): Promise<void> {
+    await db.tasks
+      .where('id')
+      .equals(id)
+      .modify((t) => {
+        delete t.completedAt;
+        t.updatedAt = Date.now();
+      });
+  },
+
   async remove(id: string): Promise<void> {
     await db.tasks.delete(id);
-  },
-
-  /** 批量写入（初始种子数据填充用） */
-  async bulkAdd(tasks: Task[]): Promise<void> {
-    await db.tasks.bulkAdd(tasks);
-  },
-
-  /** 按标签批量删除（初始种子数据清除用），返回删除条数 */
-  async removeByTag(tag: string): Promise<number> {
-    const ids = await db.tasks.filter((t) => t.tags?.includes(tag) ?? false).primaryKeys();
-    await db.tasks.bulkDelete(ids);
-    return ids.length;
   },
 
   async getById(id: string): Promise<Task | undefined> {

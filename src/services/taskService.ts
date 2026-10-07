@@ -61,6 +61,11 @@ export const taskService = {
     await taskRepo.complete(id);
   },
 
+  /** 取消归档（2026-10-06 修订九）：抹掉 completedAt，条目回到待办/四象限 */
+  async unarchiveTask(id: string): Promise<void> {
+    await taskRepo.uncomplete(id);
+  },
+
   /** 真删 + 返回快照供撤销（§15-6：真删 + toast 撤销 5s，不做回收站） */
   async deleteTask(id: string): Promise<Task | undefined> {
     const snapshot = await taskRepo.getById(id);

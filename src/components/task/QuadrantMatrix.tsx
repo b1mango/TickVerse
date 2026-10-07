@@ -3,27 +3,25 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
-  type PointerSensorOptions,
 } from '@dnd-kit/core';
 import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { CloudSun, Flame, RotateCcw, Sprout, Zap } from 'lucide-react';
+import { CloudSun, Flame, Sprout, Zap } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { EditingSafePointerSensor } from '@/components/task/EditingSafePointerSensor';
 import { SortableTaskItem } from '@/components/task/SortableTaskItem';
 import { TaskItem } from '@/components/task/TaskItem';
 import type { QuadrantMoveDescriptor } from '@/services/taskService';
 import type { QuadrantLayoutMode } from '@/types/settings';
-import { DEFAULT_QUADRANT_COLUMN_WIDTHS } from '@/types/settings';
 import type { Quadrant, Task } from '@/types/task';
 
 interface QuadrantColumnMeta {
@@ -43,43 +41,16 @@ const COLUMNS: readonly QuadrantColumnMeta[] = [
   { id: 'q4', title: '不重要不紧急', icon: CloudSun, stripe: 'border-t-line', tone: 'text-sub' },
 ];
 
-const LAYOUTS: readonly { value: QuadrantLayoutMode; label: string }[] = [
-  { value: 'columns', label: '四列' },
-  { value: 'grid', label: '四象限' },
-];
-
-/**
- * 编辑安全指针传感器（2026-10-06 修订七）：按下点落在编辑输入
- * （textarea / input / contenteditable）上时不激活拖拽——编辑态鼠标拖选文字不再拖动卡片；
- * 其余位置与原生 PointerSensor 一致（isPrimary + 主键）。
- */
-class EditingSafePointerSensor extends PointerSensor {
-  static activators = [
-    {
-      eventName: 'onPointerDown' as const,
-      handler: (
-        { nativeEvent }: React.PointerEvent,
-        { onActivation }: PointerSensorOptions,
-      ): boolean => {
-        const target = nativeEvent.target as HTMLElement | null;
-        if (target?.closest('textarea, input, [contenteditable="true"]')) return false;
-        if (!nativeEvent.isPrimary || nativeEvent.button !== 0) return false;
-        onActivation?.({ event: nativeEvent });
-        return true;
-      },
-    },
-  ];
-}
-
 /** 列宽调节的 flex-grow 下限（防止列被拖没） */
 const MIN_COLUMN_GROW = 0.5;
-/** 象限列卡片统一高度（520 → 620 ≈ 加四行正文高度，2026-10-06 用户钦定；内容超长列内纵滚，不撑高卡片） */
+/** 象限列卡片高度上限（520 → 620 ≈ 加四行正文高度，2026-10-06 用户钦定）。
+ *  高度随窗口动态调整（2026-10-07 修订十一）：钳 260px ~ 上限 × 视口余量，
+ *  窗口缩小时卡片变矮（内容超长列内纵滚），不再一刀切撑出页外 */
 const COLUMN_HEIGHT_PX = 620;
 
 interface QuadrantMatrixProps {
   tasksByQuadrant: Record<Quadrant, Task[]>;
   layout: QuadrantLayoutMode;
-  onLayoutChange: (mode: QuadrantLayoutMode) => void;
   columnWidths: number[];
   onColumnWidthsChange: (widths: number[]) => void;
   onAdd: (title: string, quadrant: Quadrant) => void;
@@ -133,7 +104,7 @@ function QuadrantColumn({
       } transition-[transform,border-color] duration-[var(--dur-fast)] ${
         activeId === null ? 'hover:-translate-y-0.5' : ''
       }`}
-      style={{ height: COLUMN_HEIGHT_PX }}
+      style={{ height: `clamp(260px, calc(100dvh - 272px), ${COLUMN_HEIGHT_PX}px)` }}
     >
       <header className="flex shrink-0 items-baseline gap-2 border-b border-line/60 pb-3">
         <Icon size={15} className={`translate-y-[2px] ${tone}`} />
@@ -188,7 +159,6 @@ function QuadrantColumn({
 export function QuadrantMatrix({
   tasksByQuadrant,
   layout,
-  onLayoutChange,
   columnWidths,
   onColumnWidthsChange,
   onAdd,
@@ -286,47 +256,8 @@ export function QuadrantMatrix({
     });
   };
 
-  const isDefaultWidths = DEFAULT_QUADRANT_COLUMN_WIDTHS.every((w, i) => columnWidths[i] === w);
-  /** 恢复默认等宽：清除自定义列宽（localStorage 回默认 [1,1,1,1]） */
-  const handleResetWidths = () => {
-    liveWidthsRef.current = null;
-    setLiveWidths(null);
-    onColumnWidthsChange([...DEFAULT_QUADRANT_COLUMN_WIDTHS]);
-  };
-
   return (
     <section>
-      {/* 模块头只保留右侧操作区（2026-10-06 用户钦定精简） */}
-      <header className="flex items-center justify-end gap-2">
-        {/* 恢复默认宽度：仅存在自定义列宽时可点（沿用设置页按钮风格） */}
-        <button
-          type="button"
-          onClick={handleResetWidths}
-          disabled={isDefaultWidths}
-          title="恢复默认宽度"
-          className="flex items-center gap-1 rounded-ctl border border-line px-2 py-1.5 font-mono text-caption text-sub transition-colors hover:text-ink disabled:opacity-40"
-        >
-          <RotateCcw size={12} />
-          恢复默认宽度
-        </button>
-        <div className="flex gap-2">
-          {LAYOUTS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => onLayoutChange(value)}
-              className={`rounded-ctl border px-3 py-1 font-mono text-caption transition-colors ${
-                layout === value
-                  ? 'border-accent text-accent'
-                  : 'border-line text-sub hover:text-ink'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </header>
-
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
@@ -337,8 +268,8 @@ export function QuadrantMatrix({
         <div
           className={
             layout === 'grid'
-              ? 'mt-3 grid grid-cols-2 items-stretch gap-6'
-              : 'mt-3 flex flex-wrap items-stretch gap-6'
+              ? 'mt-2 grid grid-cols-2 items-stretch gap-6'
+              : 'mt-2 flex flex-wrap items-stretch gap-6'
           }
         >
           {COLUMNS.map((meta, i) => (
