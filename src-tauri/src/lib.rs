@@ -1,3 +1,4 @@
+mod widget_state;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -22,6 +23,7 @@ pub fn run() {
             .build(),
         )?;
       }
+      widget_state::restore(app.handle());
       setup_widget_desktop(app)?;
       setup_widget_snap(app)?;
       #[cfg(target_os = "macos")]
@@ -33,6 +35,9 @@ pub fn run() {
     .expect("error while building tauri application");
 
   app.run(|app_handle, event| {
+    if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
+      widget_state::save(app_handle);
+    }
     // Dock 点击：主窗隐藏（关窗不退出）时只亮组件不回主窗——Reopen 强制唤起主窗
     #[cfg(target_os = "macos")]
     if let tauri::RunEvent::Reopen { .. } = event {
@@ -328,9 +333,10 @@ fn widget_set_frame(
 
 /// 结束 resize，取消 resize 期间产生的旧吸附计时器。
 #[tauri::command]
-fn widget_resize_end() -> Result<(), String> {
+fn widget_resize_end(app: tauri::AppHandle) -> Result<(), String> {
   WIDGET_RESIZE_ACTIVE.store(false, std::sync::atomic::Ordering::SeqCst);
   SNAP_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  widget_state::save(&app);
   Ok(())
 }
 
@@ -356,7 +362,10 @@ fn main_window_show(app: tauri::AppHandle) -> Result<(), String> {
   let Some(w) = app.get_webview_window("main") else {
     return Ok(());
   };
+  #[cfg(target_os = "macos")]
+  app.set_activation_policy(tauri::ActivationPolicy::Regular).map_err(|e| e.to_string())?;
   w.show().map_err(|e| e.to_string())?;
+  w.unminimize().map_err(|e| e.to_string())?;
   w.set_focus().map_err(|e| e.to_string())
 }
 
@@ -465,6 +474,7 @@ fn schedule_snap(w: tauri::WebviewWindow, delay_ms: u64) {
       && !WIDGET_RESIZE_ACTIVE.load(Ordering::SeqCst)
     {
       snap_window(&w);
+      widget_state::save(w.app_handle());
     }
     SNAP_RUNNING.store(false, Ordering::SeqCst);
   });
@@ -754,7 +764,7 @@ fn native_widget_frames() -> Vec<SnapRect> {
 
 /* ---------- macOS 关窗行为 ---------- */
 
-/// mac 惯例：关窗 = 隐藏不退出（组件常驻的配套——主窗口关进程也仍在），
+/// 主窗红色关闭按钮：隐藏主窗并切换 Accessory，移除 Dock 图标，保留组件。
 /// 退出走 Cmd+Q / Dock 菜单；不引入托盘常驻（2026-10-06 用户钦定不要托盘）。
 /// Windows 保持原生默认：关主窗口即退出。
 #[cfg(target_os = "macos")]
@@ -767,7 +777,11 @@ fn setup_close_to_hide(app: &tauri::App) -> tauri::Result<()> {
     win.on_window_event(move |event| {
       if let tauri::WindowEvent::CloseRequested { api, .. } = event {
         api.prevent_close();
+        widget_state::save(w.app_handle());
         let _ = w.hide();
+        if w.label() == "main" {
+          let _ = w.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);
+        }
       }
     });
   }
