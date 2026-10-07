@@ -1,10 +1,10 @@
 [package]
 name = "app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "0.0.1"
+description = "TickVerse personal tasks and desktop widget"
+authors = ["b1mango"]
 license = ""
-repository = ""
+repository = "https://github.com/b1mango/TickVerse"
 edition = "2021"
 rust-version = "1.77.2"
 

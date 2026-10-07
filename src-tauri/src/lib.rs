@@ -248,7 +248,7 @@ fn widget_resize_begin(app: tauri::AppHandle) -> Result<WidgetNativeFrame, Strin
       return Err("组件窗口不存在".to_string());
     };
     let position = window.outer_position().map_err(|e| e.to_string())?;
-    let size = window.outer_size();
+    let size = window.outer_size().map_err(|e| e.to_string())?;
     let scale = window.scale_factor().unwrap_or(1.0);
     return Ok(WidgetNativeFrame {
       x: position.x as f64 / scale,
