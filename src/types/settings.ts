@@ -79,6 +79,8 @@ export const DEFAULT_WEBDAV: WebdavConfig = {
  */
 export interface WidgetPrefs {
   visible: boolean;
+  /** 固定组件位置与尺寸；任务仍可编辑。 */
+  locked: boolean;
   /** 组件正文字号（px，基准 15；组件侧 zoom = font/15），WIDGET_FONT_RANGE 范围内 */
   font: number;
   /** 组件窗口透明度（NSWindow alpha），WIDGET_OPACITY_RANGE 范围内 */
@@ -90,7 +92,7 @@ export interface WidgetPrefs {
 
 export const WIDGET_STORAGE_KEY = 'tickverse.widget';
 
-export const DEFAULT_WIDGET: WidgetPrefs = { visible: true, font: 15, opacity: 1 };
+export const DEFAULT_WIDGET: WidgetPrefs = { visible: true, locked: false, font: 15, opacity: 1 };
 
 /** 字号滑动条范围（正文字号 px） */
 export const WIDGET_FONT_RANGE = { min: 12, max: 22, step: 0.5 } as const;

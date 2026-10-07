@@ -103,6 +103,7 @@ function loadWidget(): WidgetPrefs {
     const num = (v: unknown, min: number, max: number): number | undefined =>
       typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined;
     return {
+      locked: typeof parsed.locked === 'boolean' ? parsed.locked : false,
       visible: typeof parsed.visible === 'boolean' ? parsed.visible : DEFAULT_WIDGET.visible,
       font: num(parsed.font, WIDGET_FONT_RANGE.min, WIDGET_FONT_RANGE.max) ?? DEFAULT_WIDGET.font,
       opacity:
@@ -207,7 +208,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ webdav });
   },
   setWidget: (patch) => {
-    const widget = { ...get().widget, ...patch };
+    const widget = { ...loadWidget(), ...patch };
     localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(widget));
     set({ widget });
   },

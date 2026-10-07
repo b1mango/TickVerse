@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { AppWindow } from 'lucide-react';
+import { AppWindow, Pin, PinOff } from 'lucide-react';
 import {
   beginWidgetResize,
   endWidgetResize,
@@ -142,6 +142,7 @@ function startResize(dir: WidgetResizeDirection, onResizeState: (active: boolean
  */
 export function WidgetApp() {
   const font = useSettingsStore((s) => s.widget.font);
+  const locked = useSettingsStore((s) => s.widget.locked);
   const opacity = useSettingsStore((s) => s.widget.opacity);
   const resizingRef = useRef(false);
 
@@ -165,7 +166,7 @@ export function WidgetApp() {
   // 松手快路：native 拖窗收不到 pointerup 时由 Rust 600ms 静默兜底，这里双保险（幂等）
   useEffect(() => {
     const up = () => {
-      if (!resizingRef.current) void snapWidgetNow();
+      if (!resizingRef.current && !useSettingsStore.getState().widget.locked) void snapWidgetNow();
     };
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
@@ -204,14 +205,24 @@ export function WidgetApp() {
       {/* 拖动条（data-tauri-drag-region）：仅此条可拖窗；双击复位默认尺寸（2026-10-07 修订十三） */}
       <header className="flex h-7 shrink-0 select-none items-center">
         <span
-          data-tauri-drag-region
-          onDoubleClick={() => void setWidgetSize(600, 460)}
-          onPointerUp={() => void snapWidgetNow()}
-          title="拖动移动位置 · 双击复位尺寸"
+          data-tauri-drag-region={locked ? undefined : true}
+          onDoubleClick={() => { if (!locked) void setWidgetSize(600, 460); }}
+          onPointerUp={() => { if (!locked) void snapWidgetNow(); }}
+          title={locked ? '已固定 · 点击图钉解锁' : '拖动移动位置 · 双击复位尺寸'}
           className="flex flex-1 items-center self-stretch px-1 font-mono text-caption text-sub"
         >
           待办清单
         </span>
+        <button
+          type="button"
+          aria-label={locked ? '取消固定组件' : '固定组件'}
+          aria-pressed={locked}
+          title={locked ? '取消固定组件' : '固定组件'}
+          onClick={() => useSettingsStore.getState().setWidget({ locked: !locked })}
+          className={`px-1 transition-colors focus-visible:outline focus-visible:outline-accent ${locked ? 'text-accent' : 'text-sub hover:text-ink'}`}
+        >
+          {locked ? <PinOff size={13} /> : <Pin size={13} />}
+        </button>
         <button
           onClick={() => void showMainWindow()}
           title="打开主窗口"
@@ -225,7 +236,7 @@ export function WidgetApp() {
       <Toast />
 
       {/* 边框全域调尺寸热区（z 置顶，置于根 p-2 留白带，不遮卡片交互） */}
-      {RESIZE_HANDLES.map(({ dir, className }) => (
+      {!locked && RESIZE_HANDLES.map(({ dir, className }) => (
         <div
           key={dir}
           onPointerDown={startResize(dir, (active) => {
