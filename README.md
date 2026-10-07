@@ -1,32 +1,42 @@
-# 拾刻 TickVerse
+# TickVerse
 
-一款本地优先的个人待办与回望工具——用四象限（艾森豪威尔矩阵）管理待办，沉淀成可缩放的时间轴，再用统计与 AI 总结把勾掉的事升维成叙事。档案室水墨视觉，数据不出本机。
+<p align="center">
+  <img src="public/icons/icon-192.png" alt="TickVerse" width="112" height="112" />
+</p>
+
+<p align="center">本地优先的个人待办与回望工具</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/status-development-2ea043" alt="status development" />
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-1f6feb" alt="Windows and macOS" />
+  <a href="#license"><img src="https://img.shields.io/badge/license-pending-f5c542" alt="license pending" /></a>
+</p>
 
 ## 功能
 
-- **记录页**：四象限（重要且紧急 / 重要不紧急 / 紧急不重要 / 不重要不紧急），连续录入、勾选归档、双击编辑、删除可撤销；跨象限拖拽（浮层抬升投影、目标列高亮 + 让位过渡、reduced-motion 降级）；两种版式（四列响应式 / 固定 2x2 宫格）+ 列右缘拖调宽度 + 一键恢复等宽，均本地持久化；列卡定高、超长列内纵滚
-- **时间轴**：全部记录沉淀为可连续缩放的时间地图，六档视图（日 / 周 / 月 / 季 / 年 / 年视图），Ctrl+滚轮 / 左下 ＋− 控件换档、捏合缩放、滚轮分区（卡片定高内纵滚、刻度带上横向滑轴）、年份水墨标记与轴体居中对称；象限任务按虚线投影落在写入当日卡
-- **回望**：周 / 月 / 年完成趋势图、GitHub 风年度热力图、连续打卡与空窗指标；**AI 总结**（OpenAI 兼容接口，流式输出、切页不中断、可选模型、结果缓存可手改，生成前有一次性隐私说明）
-- **多端**：Tauri Windows 桌面端 + PWA；**WebDAV 同步**（坚果云 / 自有 NAS）与 JSON 导出备份
-- **视觉**：档案室 / 极简双风格 × 明 / 暗 / 跟随系统，全局水墨无背景滑动条
+- 四象限待办管理：支持连续录入、编辑、完成归档、删除撤销和跨象限拖拽，任务数据保存在本机
+- 时间轴回顾：将任务沉淀为可缩放的时间地图，支持日、周、月、季、年等视图
+- 完成统计：提供周 / 月 / 年趋势、连续打卡、空窗指标、完成清单和年度热力图
+- AI 总结：通过 OpenAI 兼容接口生成周期总结，支持流式输出、模型选择与本地缓存
+- 数据管理：支持 JSON 导出与导入；备份不包含 AI API Key 或 WebDAV 凭据
+- WebDAV 同步：以单个 JSON 快照同步任务与总结，支持坚果云或自有 NAS，凭据仅存本机
+- 多端使用：提供 Tauri 桌面端（Windows / macOS）与 PWA，主题偏好仅存本机
 
-## 技术栈
+## 安装
 
-React 19 · TypeScript · Vite · Tailwind CSS · Zustand · Dexie（IndexedDB）· dnd-kit · @tanstack/react-virtual · GSAP · ECharts · Tauri 2
+当前仓库尚未发布 GitHub Release。克隆源码并安装依赖后，可运行 Web / PWA 开发版本；需要桌面安装包时，请按开发命令执行 Tauri 构建。
 
 ## 开发
 
 ```bash
 npm install
-npm run dev          # Web 端开发（5173）
-npm run test         # 单元测试（vitest）
+npm run dev          # Web 端开发（Vite）
+npm run test         # 单元测试（Vitest）
 npm run lint         # ESLint（零警告门禁）
-npm run build        # 产出 dist/
-npx tauri build      # 打包 Windows 安装包（NSIS/MSI）
+npm run build        # TypeScript 检查并构建 dist/
+npx tauri build      # 构建 Tauri 桌面安装包
 ```
 
-## 说明
+## License
 
-- 数据仅存本机（IndexedDB / localStorage），API Key 不随备份与同步外传
-- AI 总结接入任意 OpenAI 兼容服务（DeepSeek / Kimi / 通义等），在设置页填 Base URL 与 Key 后获取模型列表勾选即可
-- 本机首次启动且库为空时自动写入四象限初始待办（带 seed 标签，可在设置页"初始数据"一键清除）
+许可证待定。
